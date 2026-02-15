@@ -8,7 +8,7 @@ authenticate to CLISHOP,
 
 manage ordering-related profile data (as supported by the platform),
 
-search/quote/buy items through CLISHOP’s backend,
+search/quote/buy items through CLISHOP's backend,
 
 view order history and track shipments,
 
@@ -16,7 +16,90 @@ get a consistent, scriptable interface to ordering workflows.
 
 The CLI is a client. It does not own the database, vendor integrations, or order orchestration logic. It talks to CLISHOP-BACKEND over HTTPS APIs.
 
-What this repo is responsible for
+## Quick Start
+
+```bash
+# Install dependencies
+npm install
+
+# Build the CLI
+npm run build
+
+# Run it
+node dist/index.js --help
+
+# Or link it globally
+npm link
+clishop --help
+```
+
+## Commands
+
+```
+clishop login           Log in to your CLISHOP account
+clishop register        Create a new CLISHOP account
+clishop logout          Log out
+clishop whoami          Show current user
+
+clishop agent list      List all agents
+clishop agent create    Create a new agent (safety profile)
+clishop agent use       Switch the active agent
+clishop agent show      Show agent details
+clishop agent update    Update agent settings
+clishop agent delete    Delete an agent
+
+clishop address list    List addresses for the active agent
+clishop address add     Add a new address
+clishop address remove  Remove an address
+clishop address set-default  Set default address
+
+clishop payment list    List payment methods
+clishop payment add     Add a payment method (opens browser)
+clishop payment remove  Remove a payment method
+clishop payment set-default  Set default payment
+
+clishop search <query>  Search for products
+clishop product <id>    View product details
+
+clishop buy <productId> Quick-buy a product
+clishop order list      List your orders
+clishop order show <id> Show order details
+clishop order cancel    Cancel an order
+
+clishop review add      Write a product review
+clishop review list     List your reviews
+clishop review delete   Delete a review
+
+clishop config show     Show configuration
+clishop config set-api-url  Set backend URL
+clishop config set-output   Set output format
+clishop config reset    Reset configuration
+```
+
+## Agents
+
+Agents are safety profiles for ordering. Every user has a "default" agent.
+Each agent has its own:
+
+- Max order amount (safety limit)
+- Allowed/blocked product categories
+- Default shipping address
+- Default payment method
+- Confirmation requirement
+
+Use `--agent <name>` on any command to use a specific agent for that invocation.
+
+## Configuration
+
+Config is stored locally at `~/.config/clishop/config.json` (or platform equivalent).
+Auth tokens are stored securely in the OS keychain via `keytar`.
+
+Set the backend URL:
+```bash
+clishop config set-api-url https://api.clishop.dev/api
+```
+
+## What this repo is responsible for
 Buyer experience in the terminal
 
 A fast, ergonomic command set for ordering workflows
@@ -70,18 +153,6 @@ Implementing vendor integrations/connectors
 Handling payment card data (the CLI should never collect raw card details)
 
 Running background order workflows (that happens in CLISHOP-BACKEND)
-
-Shared contracts
-
-The CLI depends on versioned packages published by CLISHOP-BACKEND:
-
-@clishop/types
-Shared types/schemas derived from the backend’s canonical API contract.
-
-@clishop/buyer-client
-A typed API client used by the CLI to call the backend consistently.
-
-These packages are the mechanism that keeps the CLI aligned with the backend API as it evolves.
 
 Relationship to other CLISHOP repositories
 

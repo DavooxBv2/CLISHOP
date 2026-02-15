@@ -1,0 +1,42 @@
+---
+alwaysApply: true
+---
+
+# Commit Workflow
+
+After completing any feature, fix, or meaningful change, **you must commit the work yourself** using git. Do not wait for the user to commit.
+
+## Rules
+
+1. **Commit after every completed feature or fix** — don't batch unrelated changes together.
+2. **Use conventional commit messages** following this format:
+   ```
+   <type>(<scope>): <short description>
+   ```
+   Types: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `style`, `perf`
+   Scope: the area of the codebase (e.g. `auth`, `agent`, `search`, `config`, `db`)
+
+3. **Stage only the files relevant to that feature** — use `git add <specific files>` not `git add .` unless everything is related.
+4. **Never commit** `.env`, `node_modules`, `dist`, `*.db`, or secrets.
+5. **Check `git status` before committing** to make sure you're not including unwanted files.
+6. **If working across multiple repos** (CLI + Backend), commit to each repo separately with its own message.
+
+## Examples
+
+```
+feat(auth): add login and register commands
+feat(agent): implement agent CRUD with safety thresholds
+fix(search): handle empty query results gracefully
+chore(config): add environment variable support
+docs: update README with command reference
+```
+
+## Multi-repo awareness
+
+This workspace contains multiple repos:
+- `CLISHOP2-CLI` — the CLI client
+- `CLISHOP-BACKEND` — the API server
+- `CLISHOP-WEB` — the website (future)
+- `CLISHOP-VENDORSDK` — vendor SDK (future)
+
+Always `cd` into the correct repo directory before running git commands.
