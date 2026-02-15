@@ -49,7 +49,7 @@ export function registerAddressCommands(program: Command): void {
           console.log(`${marker}${chalk.bold(addr.label)} ${chalk.dim(`(${addr.id})`)}`);
           console.log(`    ${addr.line1}`);
           if (addr.line2) console.log(`    ${addr.line2}`);
-          console.log(`    ${addr.city}, ${addr.state} ${addr.postalCode}`);
+          console.log(`    ${addr.city}${addr.region ? `, ${addr.region}` : ""} ${addr.postalCode}`);
           console.log(`    ${addr.country}`);
           console.log();
         }
@@ -86,7 +86,7 @@ export function registerAddressCommands(program: Command): void {
             message: "City:",
             validate: (v: string) => (v.trim() ? true : "Required"),
           },
-          { type: "input", name: "state", message: "State / Province / Region:" },
+          { type: "input", name: "region", message: "State / Province / Region (optional):" },
           {
             type: "input",
             name: "country",
@@ -109,7 +109,7 @@ export function registerAddressCommands(program: Command): void {
           line1: answers.line1,
           line2: answers.line2 || undefined,
           city: answers.city,
-          state: answers.state,
+          region: answers.region || undefined,
           postalCode: answers.postalCode,
           country: answers.country,
         });

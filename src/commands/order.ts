@@ -7,29 +7,39 @@ import { getActiveAgent } from "../config.js";
 
 export interface Order {
   id: string;
+  checkoutId?: string;
   status: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
   items: OrderItem[];
-  totalAmount: number;
+  totalAmountInCents: number;
   currency: string;
+  storeName?: string;
   shippingAddressId: string;
   paymentMethodId: string;
+  paymentLabel?: string;
   agent: string;
   createdAt: string;
   updatedAt: string;
-  trackingNumber?: string;
-  trackingUrl?: string;
+  shipments?: Shipment[];
 }
 
 export interface OrderItem {
   productId: string;
   productName: string;
   quantity: number;
-  unitPrice: number;
-  totalPrice: number;
+  unitPriceInCents: number;
+  totalPriceInCents: number;
 }
 
-function formatPrice(price: number, currency: string): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(price);
+export interface Shipment {
+  id: string;
+  carrier?: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
+  status: string;
+}
+
+function formatPrice(cents: number, currency: string): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
 }
 
 const STATUS_COLORS: Record<string, (s: string) => string> = {
@@ -78,13 +88,13 @@ export function registerOrderCommands(program: Command): void {
         prodSpinner.stop();
         const product = prodRes.data.product;
 
-        const totalPrice = product.price * opts.quantity;
+        const totalCents = product.priceInCents * opts.quantity;
 
-        // Safety check: max order amount
-        if (agent.maxOrderAmount && totalPrice > agent.maxOrderAmount) {
+        // Safety check: max order amount (local agent config is in dollars)
+        if (agent.maxOrderAmount && (totalCents / 100) > agent.maxOrderAmount) {
           console.error(
             chalk.red(
-              `\n✗ Order total (${formatPrice(totalPrice, product.currency)}) exceeds agent "${agent.name}" limit of $${agent.maxOrderAmount}.`
+              `\n✗ Order total (${formatPrice(totalCents, product.currency)}) exceeds agent "${agent.name}" limit of $${agent.maxOrderAmount}.`
             )
           );
           process.exitCode = 1;
@@ -107,8 +117,9 @@ export function registerOrderCommands(program: Command): void {
         if (agent.requireConfirmation && !opts.yes) {
           console.log(chalk.bold("\n  Order Summary:"));
           console.log(`    Product:  ${product.name}`);
+          console.log(`    Store:    ${product.vendor || product.storeName || "—"}`);
           console.log(`    Quantity: ${opts.quantity}`);
-          console.log(`    Total:    ${chalk.bold(formatPrice(totalPrice, product.currency))}`);
+          console.log(`    Total:    ${chalk.bold(formatPrice(totalCents, product.currency))}`);
           console.log(`    Agent:    ${agent.name}`);
           console.log();
 
@@ -176,7 +187,7 @@ export function registerOrderCommands(program: Command): void {
           const statusColor = STATUS_COLORS[o.status] || chalk.white;
           const date = new Date(o.createdAt).toLocaleDateString();
           console.log(
-            `  ${chalk.bold(o.id)}  ${statusColor(o.status.toUpperCase().padEnd(12))}  ${formatPrice(o.totalAmount, o.currency)}  ${chalk.dim(date)}  ${chalk.dim(`agent: ${o.agent}`)}`
+            `  ${chalk.bold(o.id)}  ${statusColor(o.status.toUpperCase().padEnd(12))}  ${formatPrice(o.totalAmountInCents, o.currency)}  ${chalk.dim(date)}  ${chalk.dim(`agent: ${o.agent}`)}`
           );
           for (const item of o.items) {
             console.log(chalk.dim(`    · ${item.productName} × ${item.quantity}`));
@@ -211,17 +222,21 @@ export function registerOrderCommands(program: Command): void {
         console.log();
         console.log(chalk.bold(`  Order ${o.id}`));
         console.log(`  Status:   ${statusColor(o.status.toUpperCase())}`);
-        console.log(`  Total:    ${chalk.bold(formatPrice(o.totalAmount, o.currency))}`);
+        console.log(`  Total:    ${chalk.bold(formatPrice(o.totalAmountInCents, o.currency))}`);
+        if (o.storeName) console.log(`  Store:    ${o.storeName}`);
         console.log(`  Agent:    ${o.agent}`);
+        if (o.paymentLabel) console.log(`  Payment:  ${o.paymentLabel}`);
         console.log(`  Placed:   ${new Date(o.createdAt).toLocaleString()}`);
         console.log(`  Updated:  ${new Date(o.updatedAt).toLocaleString()}`);
-        if (o.trackingNumber) {
-          console.log(`  Tracking: ${o.trackingNumber}`);
-          if (o.trackingUrl) console.log(`  Track:    ${chalk.cyan.underline(o.trackingUrl)}`);
+        if (o.shipments?.length) {
+          for (const s of o.shipments) {
+            console.log(`  Tracking: ${s.trackingNumber || "pending"} ${s.carrier ? `(${s.carrier})` : ""}`);
+            if (s.trackingUrl) console.log(`  Track:    ${chalk.cyan.underline(s.trackingUrl)}`);
+          }
         }
         console.log(chalk.bold("\n  Items:"));
         for (const item of o.items) {
-          console.log(`    · ${item.productName} × ${item.quantity}  ${formatPrice(item.totalPrice, o.currency)}`);
+          console.log(`    · ${item.productName} × ${item.quantity}  ${formatPrice(item.totalPriceInCents, o.currency)}`);
         }
         console.log();
       } catch (error) {

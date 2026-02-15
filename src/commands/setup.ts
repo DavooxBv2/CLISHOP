@@ -30,11 +30,11 @@ function stepHeader(step: number, total: number, title: string): void {
   console.log();
 }
 
-function formatPrice(price: number, currency = "USD"): string {
+function formatPrice(cents: number, currency = "USD"): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
-  }).format(price);
+  }).format(cents / 100);
 }
 
 // ── Command Registration ───────────────────────────────────────────────
@@ -347,8 +347,8 @@ export async function runSetupWizard(): Promise<void> {
       },
       {
         type: "input",
-        name: "state",
-        message: "State / Province / Region:",
+        name: "region",
+        message: "State / Province / Region (optional):",
       },
       {
         type: "input",
@@ -370,7 +370,7 @@ export async function runSetupWizard(): Promise<void> {
         line1: addr.line1,
         line2: addr.line2 || undefined,
         city: addr.city,
-        state: addr.state,
+        region: addr.region || undefined,
         postalCode: addr.postalCode,
         country: addr.country,
       });
@@ -525,7 +525,7 @@ export async function runSetupWizard(): Promise<void> {
         );
 
         for (const p of result.products) {
-          const price = formatPrice(p.price, p.currency || "USD");
+          const price = formatPrice(p.priceInCents, p.currency || "USD");
           const stock = p.inStock
             ? chalk.green("In Stock")
             : chalk.red("Out of Stock");

@@ -7,10 +7,12 @@ export interface Product {
   id: string;
   name: string;
   description: string;
-  price: number;
+  priceInCents: number;
   currency: string;
   category: string;
   vendor: string;
+  storeId: string;
+  storeName: string;
   rating: number;
   reviewCount: number;
   inStock: boolean;
@@ -24,11 +26,11 @@ export interface SearchResult {
   pageSize: number;
 }
 
-function formatPrice(price: number, currency: string): string {
+function formatPrice(cents: number, currency: string): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
-  }).format(price);
+  }).format(cents / 100);
 }
 
 function renderStars(rating: number): string {
@@ -93,7 +95,7 @@ export function registerSearchCommands(program: Command): void {
 
         for (const p of result.products) {
           const stock = p.inStock ? chalk.green("In Stock") : chalk.red("Out of Stock");
-          const price = chalk.bold.white(formatPrice(p.price, p.currency));
+          const price = chalk.bold.white(formatPrice(p.priceInCents, p.currency));
           const stars = chalk.yellow(renderStars(p.rating));
 
           console.log(`  ${chalk.bold.cyan(p.name)} ${chalk.dim(`(${p.id})`)}`);
@@ -135,11 +137,11 @@ export function registerSearchCommands(program: Command): void {
         console.log(chalk.bold.cyan(`  ${p.name}`));
         console.log(chalk.dim(`  ID: ${p.id}`));
         console.log();
-        console.log(`  Price:    ${chalk.bold(formatPrice(p.price, p.currency))}`);
+        console.log(`  Price:    ${chalk.bold(formatPrice(p.priceInCents, p.currency))}`);
         console.log(`  Status:   ${p.inStock ? chalk.green("In Stock") : chalk.red("Out of Stock")}`);
         console.log(`  Rating:   ${chalk.yellow(renderStars(p.rating))} ${chalk.dim(`(${p.reviewCount} reviews)`)}`);
         console.log(`  Category: ${p.category}`);
-        console.log(`  Vendor:   ${p.vendor}`);
+        console.log(`  Store:    ${p.vendor}`);
         console.log();
         console.log(`  ${p.description}`);
         console.log();
