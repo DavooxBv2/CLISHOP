@@ -20,6 +20,8 @@ export interface AdvertiseRequest {
   bidPriceInCents?: number;
   currency: string;
   speedDays?: number;
+  freeReturns?: boolean;
+  minReturnDays?: number;
   paymentMethods?: string; // "all" or JSON array of payment method IDs
   address?: {
     id: string;
@@ -44,6 +46,8 @@ export interface AdvertiseBid {
   priceInCents: number;
   currency: string;
   shippingDays?: number;
+  freeReturns?: boolean;
+  returnWindowDays?: number;
   note?: string;
   store?: {
     id: string;
@@ -208,6 +212,21 @@ export function registerAdvertiseCommands(program: Command): void {
           },
         ]);
 
+        // Return policy preferences
+        const returnAnswers = await inquirer.prompt([
+          {
+            type: "confirm",
+            name: "freeReturns",
+            message: "Require free returns?",
+            default: false,
+          },
+          {
+            type: "input",
+            name: "minReturnDays",
+            message: "Minimum return window in days (optional, e.g. 30):",
+          },
+        ]);
+
         // Address selection
         const api = getApiClient();
         let addressId: string | undefined;
@@ -325,6 +344,15 @@ export function registerAdvertiseCommands(program: Command): void {
             body.speedDays = days;
           }
         }
+        if (returnAnswers.freeReturns) {
+          body.freeReturns = true;
+        }
+        if (returnAnswers.minReturnDays) {
+          const days = parseInt(returnAnswers.minReturnDays, 10);
+          if (!isNaN(days) && days > 0) {
+            body.minReturnDays = days;
+          }
+        }
 
         const spinner = ora("Publishing your request...").start();
         const res = await api.post("/advertise", body);
@@ -352,6 +380,8 @@ export function registerAdvertiseCommands(program: Command): void {
     .option("--bid-price <price>", "Max bid price", parseFloat)
     .option("--currency <code>", "Currency code (default: USD)")
     .option("--speed <days>", "Desired delivery days", parseInt)
+    .option("--free-returns", "Require free returns")
+    .option("--min-return-days <days>", "Minimum return window in days", parseInt)
     .option("--payment-methods <methods>", 'Payment methods: "all" or comma-separated IDs')
     .option("--address <id>", "Address ID for delivery")
     .action(async (title: string, opts) => {
@@ -390,6 +420,12 @@ export function registerAdvertiseCommands(program: Command): void {
         }
         if (opts.speed) {
           body.speedDays = opts.speed;
+        }
+        if (opts.freeReturns) {
+          body.freeReturns = true;
+        }
+        if (opts.minReturnDays) {
+          body.minReturnDays = opts.minReturnDays;
         }
 
         const spinner = ora("Publishing your request...").start();
@@ -449,6 +485,8 @@ export function registerAdvertiseCommands(program: Command): void {
           if (ad.brand) meta.push(ad.brand);
           if (ad.bidPriceInCents) meta.push(`max: ${formatPrice(ad.bidPriceInCents, ad.currency)}`);
           if (ad.speedDays) meta.push(`${ad.speedDays}-day delivery`);
+          if (ad.freeReturns) meta.push("free returns");
+          if (ad.minReturnDays) meta.push(`${ad.minReturnDays}d return min`);
           if (ad.recurring) meta.push("recurring");
           if (ad.address) meta.push(`→ ${ad.address.label}`);
           if (meta.length) {
@@ -499,6 +537,11 @@ export function registerAdvertiseCommands(program: Command): void {
         console.log(`  Quantity: ${ad.quantity}`);
         if (ad.bidPriceInCents) console.log(`  Max Bid:  ${chalk.bold(formatPrice(ad.bidPriceInCents, ad.currency))}`);
         if (ad.speedDays) console.log(`  Speed:    ${ad.speedDays}-day delivery`);
+        // Return policy requirements
+        const returnReqs: string[] = [];
+        if (ad.freeReturns) returnReqs.push(chalk.green("Free Returns required"));
+        if (ad.minReturnDays) returnReqs.push(`${ad.minReturnDays}-day return window min`);
+        if (returnReqs.length) console.log(`  Returns:  ${returnReqs.join(" · ")}`);
         if (ad.recurring) console.log(`  Recurring: Yes${ad.recurringNote ? ` (${ad.recurringNote})` : ""}`);
         if (ad.address) {
           const a = ad.address;
@@ -533,6 +576,10 @@ export function registerAdvertiseCommands(program: Command): void {
             console.log(`    ${chalk.bold(bid.id)}  ${bidStatusColor(bid.status.toUpperCase().padEnd(10))}  ${chalk.bold(formatPrice(bid.priceInCents, bid.currency))}`);
             console.log(`      Store: ${bid.store?.name || bid.storeId}${storeBadge}${storeRating}`);
             if (bid.shippingDays != null) console.log(`      Delivery: ${bid.shippingDays}-day`);
+            const bidReturns: string[] = [];
+            if (bid.freeReturns) bidReturns.push(chalk.green("Free Returns"));
+            if (bid.returnWindowDays) bidReturns.push(`${bid.returnWindowDays}-day return window`);
+            if (bidReturns.length) console.log(`      Returns: ${bidReturns.join(" · ")}`);
             if (bid.note) console.log(`      Note: ${bid.note}`);
             if (bid.product) console.log(`      Product: ${bid.product.name} (${formatPrice(bid.product.priceInCents, bid.product.currency)})`);
             console.log(`      Date: ${new Date(bid.createdAt).toLocaleString()}`);
