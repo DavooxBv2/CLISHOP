@@ -67,12 +67,32 @@ export function registerAddressCommands(program: Command): void {
         const agent = getActiveAgent();
         const answers = await inquirer.prompt([
           { type: "input", name: "label", message: "Label (e.g. Home, Office):" },
-          { type: "input", name: "line1", message: "Address line 1:" },
-          { type: "input", name: "line2", message: "Address line 2 (optional):" },
-          { type: "input", name: "city", message: "City:" },
-          { type: "input", name: "state", message: "State/Province:" },
-          { type: "input", name: "postalCode", message: "Postal code:" },
-          { type: "input", name: "country", message: "Country:", default: "US" },
+          {
+            type: "input",
+            name: "line1",
+            message: "Street name and number:",
+            validate: (v: string) => (v.trim() ? true : "Required"),
+          },
+          { type: "input", name: "line2", message: "Apartment, suite, floor, etc. (optional):" },
+          {
+            type: "input",
+            name: "postalCode",
+            message: "Postal / ZIP code:",
+            validate: (v: string) => (v.trim() ? true : "Required"),
+          },
+          {
+            type: "input",
+            name: "city",
+            message: "City:",
+            validate: (v: string) => (v.trim() ? true : "Required"),
+          },
+          { type: "input", name: "state", message: "State / Province / Region:" },
+          {
+            type: "input",
+            name: "country",
+            message: "Country:",
+            validate: (v: string) => (v.trim() ? true : "Required"),
+          },
           {
             type: "confirm",
             name: "setDefault",
