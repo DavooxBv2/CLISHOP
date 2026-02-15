@@ -239,6 +239,17 @@ export async function runSetupWizard(): Promise<void> {
     )
   );
   console.log();
+  console.log(
+    chalk.dim(
+      "  A default agent is already created for you — you don't need to"
+    )
+  );
+  console.log(
+    chalk.dim(
+      "  set one up now. You can always create more agents later."
+    )
+  );
+  console.log();
 
   const activeAgent = getActiveAgent();
 
@@ -246,10 +257,10 @@ export async function runSetupWizard(): Promise<void> {
     {
       type: "list",
       name: "agentChoice",
-      message: "How would you like to set up your agent?",
+      message: "What would you like to do?",
       choices: [
         {
-          name: `Use the default agent ($${activeAgent.maxOrderAmount} limit, confirmation required)`,
+          name: `Skip — use the default agent ($${activeAgent.maxOrderAmount} limit, confirmation required)`,
           value: "default",
         },
         {
@@ -298,7 +309,11 @@ export async function runSetupWizard(): Promise<void> {
       console.log(chalk.dim("  Continuing with the default agent."));
     }
   } else {
-    console.log(chalk.green("\n  ✓ Using the default agent."));
+    console.log(chalk.green("\n  ✓ All good — using the default agent."));
+    console.log(
+      chalk.dim("  You can create custom agents later with: ") +
+        chalk.white("clishop agent create <name>")
+    );
   }
 
   // ════════════════════════════════════════════════════════════════════
