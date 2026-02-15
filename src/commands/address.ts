@@ -8,6 +8,11 @@ import { getConfig, getActiveAgent, updateAgent } from "../config.js";
 export interface Address {
   id: string;
   label: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  companyName?: string;
+  vatNumber?: string;
+  taxId?: string;
   line1: string;
   line2?: string;
   city: string;
@@ -15,6 +20,7 @@ export interface Address {
   region?: string;
   postalCode: string;
   country: string;
+  instructions?: string;
 }
 
 export function registerAddressCommands(program: Command): void {
@@ -48,10 +54,16 @@ export function registerAddressCommands(program: Command): void {
           const isDefault = addr.id === agent.defaultAddressId;
           const marker = isDefault ? chalk.green("● ") : "  ";
           console.log(`${marker}${chalk.bold(addr.label)} ${chalk.dim(`(${addr.id})`)}`);
+          if (addr.recipientName) console.log(`    ${addr.recipientName}`);
+          if (addr.companyName) console.log(`    ${chalk.cyan(addr.companyName)}`);
           console.log(`    ${addr.line1}`);
           if (addr.line2) console.log(`    ${addr.line2}`);
           console.log(`    ${addr.city}${addr.region ? `, ${addr.region}` : ""} ${addr.postalCode}`);
           console.log(`    ${addr.country}`);
+          if (addr.recipientPhone) console.log(`    ${chalk.dim("Phone:")} ${addr.recipientPhone}`);
+          if (addr.vatNumber) console.log(`    ${chalk.dim("VAT:")} ${addr.vatNumber}`);
+          if (addr.taxId) console.log(`    ${chalk.dim("Tax ID:")} ${addr.taxId}`);
+          if (addr.instructions) console.log(`    ${chalk.dim("Instructions:")} ${addr.instructions}`);
           console.log();
         }
       } catch (error) {
@@ -68,6 +80,8 @@ export function registerAddressCommands(program: Command): void {
         const agent = getActiveAgent();
         const answers = await inquirer.prompt([
           { type: "input", name: "label", message: "Label (e.g. Home, Office):" },
+          { type: "input", name: "recipientName", message: "Recipient name (optional):" },
+          { type: "input", name: "recipientPhone", message: "Recipient phone (optional):" },
           {
             type: "input",
             name: "line1",
@@ -94,6 +108,30 @@ export function registerAddressCommands(program: Command): void {
             message: "Country:",
             validate: (v: string) => (v.trim() ? true : "Required"),
           },
+          { type: "input", name: "instructions", message: "Delivery instructions (optional):" },
+          {
+            type: "confirm",
+            name: "isCompany",
+            message: "Is this a company/business address?",
+            default: false,
+          },
+        ]);
+
+        let companyAnswers = { companyName: "", vatNumber: "", taxId: "" };
+        if (answers.isCompany) {
+          companyAnswers = await inquirer.prompt([
+            {
+              type: "input",
+              name: "companyName",
+              message: "Company name:",
+              validate: (v: string) => (v.trim() ? true : "Required for company addresses"),
+            },
+            { type: "input", name: "vatNumber", message: "VAT number (optional):" },
+            { type: "input", name: "taxId", message: "Tax ID / EIN (optional):" },
+          ]);
+        }
+
+        const { setDefault } = await inquirer.prompt([
           {
             type: "confirm",
             name: "setDefault",
@@ -107,15 +145,21 @@ export function registerAddressCommands(program: Command): void {
         const res = await api.post("/addresses", {
           agent: agent.name,
           label: answers.label,
+          recipientName: answers.recipientName || undefined,
+          recipientPhone: answers.recipientPhone || undefined,
+          companyName: companyAnswers.companyName || undefined,
+          vatNumber: companyAnswers.vatNumber || undefined,
+          taxId: companyAnswers.taxId || undefined,
           line1: answers.line1,
           line2: answers.line2 || undefined,
           city: answers.city,
           region: answers.region || undefined,
           postalCode: answers.postalCode,
           country: answers.country,
+          instructions: answers.instructions || undefined,
         });
 
-        if (answers.setDefault) {
+        if (setDefault) {
           updateAgent(agent.name, { defaultAddressId: res.data.address.id });
         }
 

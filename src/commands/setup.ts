@@ -324,6 +324,16 @@ export async function runSetupWizard(): Promise<void> {
       },
       {
         type: "input",
+        name: "recipientName",
+        message: "Recipient name (optional):",
+      },
+      {
+        type: "input",
+        name: "recipientPhone",
+        message: "Recipient phone (optional):",
+      },
+      {
+        type: "input",
         name: "line1",
         message: "Street name and number:",
         validate: (v: string) => (v.trim() ? true : "Required"),
@@ -356,7 +366,40 @@ export async function runSetupWizard(): Promise<void> {
         message: "Country:",
         validate: (v: string) => (v.trim() ? true : "Required"),
       },
+      {
+        type: "input",
+        name: "instructions",
+        message: "Delivery instructions (optional):",
+      },
+      {
+        type: "confirm",
+        name: "isCompany",
+        message: "Is this a company/business address?",
+        default: false,
+      },
     ]);
+
+    let companyInfo = { companyName: "", vatNumber: "", taxId: "" };
+    if (addr.isCompany) {
+      companyInfo = await inquirer.prompt([
+        {
+          type: "input",
+          name: "companyName",
+          message: "Company name:",
+          validate: (v: string) => (v.trim() ? true : "Required for company addresses"),
+        },
+        {
+          type: "input",
+          name: "vatNumber",
+          message: "VAT number (optional):",
+        },
+        {
+          type: "input",
+          name: "taxId",
+          message: "Tax ID / EIN (optional):",
+        },
+      ]);
+    }
 
     addressCity = addr.city;
 
@@ -367,12 +410,18 @@ export async function runSetupWizard(): Promise<void> {
       const res = await api.post("/addresses", {
         agent: agent.name,
         label: addr.label,
+        recipientName: addr.recipientName || undefined,
+        recipientPhone: addr.recipientPhone || undefined,
+        companyName: companyInfo.companyName || undefined,
+        vatNumber: companyInfo.vatNumber || undefined,
+        taxId: companyInfo.taxId || undefined,
         line1: addr.line1,
         line2: addr.line2 || undefined,
         city: addr.city,
         region: addr.region || undefined,
         postalCode: addr.postalCode,
         country: addr.country,
+        instructions: addr.instructions || undefined,
       });
       // Set as default address for this agent
       updateAgent(agent.name, { defaultAddressId: res.data.address.id });
