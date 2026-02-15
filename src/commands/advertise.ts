@@ -158,8 +158,48 @@ export function registerAdvertiseCommands(program: Command): void {
           {
             type: "input",
             name: "bidPrice",
-            message: "Max bid price you're willing to pay (in dollars, e.g. 49.99, or leave empty):",
+            message: "Max bid price you're willing to pay (e.g. 49.99, or leave empty):",
           },
+        ]);
+
+        let currency = "USD";
+        if (priceAnswers.bidPrice && parseFloat(priceAnswers.bidPrice) > 0) {
+          const currencyAnswer = await inquirer.prompt([
+            {
+              type: "list",
+              name: "currency",
+              message: "Currency:",
+              choices: [
+                { name: "USD ($)", value: "USD" },
+                { name: "EUR (€)", value: "EUR" },
+                { name: "GBP (£)", value: "GBP" },
+                { name: "CAD (C$)", value: "CAD" },
+                { name: "AUD (A$)", value: "AUD" },
+                { name: "JPY (¥)", value: "JPY" },
+                { name: "CHF (Fr)", value: "CHF" },
+                { name: "CNY (¥)", value: "CNY" },
+                { name: "INR (₹)", value: "INR" },
+                { name: "Other (enter code)", value: "OTHER" },
+              ],
+              default: "USD",
+            },
+          ]);
+          if (currencyAnswer.currency === "OTHER") {
+            const customCurrency = await inquirer.prompt([
+              {
+                type: "input",
+                name: "code",
+                message: "Enter 3-letter currency code (e.g. SEK, NZD, MXN):",
+                validate: (v: string) => /^[A-Z]{3}$/i.test(v.trim()) || "Enter a valid 3-letter code",
+              },
+            ]);
+            currency = customCurrency.code.toUpperCase().trim();
+          } else {
+            currency = currencyAnswer.currency;
+          }
+        }
+
+        const speedAnswer = await inquirer.prompt([
           {
             type: "input",
             name: "speedDays",
@@ -214,18 +254,18 @@ export function registerAdvertiseCommands(program: Command): void {
           quantity: answers.quantity || 1,
           recurring: answers.recurring,
           recurringNote,
-          currency: "USD",
+          currency,
           addressId,
         };
 
         if (priceAnswers.bidPrice) {
-          const dollars = parseFloat(priceAnswers.bidPrice);
-          if (!isNaN(dollars) && dollars > 0) {
-            body.bidPriceInCents = Math.round(dollars * 100);
+          const price = parseFloat(priceAnswers.bidPrice);
+          if (!isNaN(price) && price > 0) {
+            body.bidPriceInCents = Math.round(price * 100);
           }
         }
-        if (priceAnswers.speedDays) {
-          const days = parseInt(priceAnswers.speedDays, 10);
+        if (speedAnswer.speedDays) {
+          const days = parseInt(speedAnswer.speedDays, 10);
           if (!isNaN(days) && days > 0) {
             body.speedDays = days;
           }
@@ -254,7 +294,8 @@ export function registerAdvertiseCommands(program: Command): void {
     .option("-q, --quantity <qty>", "Quantity", parseInt, 1)
     .option("--recurring", "Recurring order")
     .option("--recurring-note <note>", "Recurrence frequency")
-    .option("--bid-price <price>", "Max bid price in dollars", parseFloat)
+    .option("--bid-price <price>", "Max bid price", parseFloat)
+    .option("--currency <code>", "Currency code (default: USD)")
     .option("--speed <days>", "Desired delivery days", parseInt)
     .option("--address <id>", "Address ID for delivery")
     .action(async (title: string, opts) => {
@@ -269,7 +310,7 @@ export function registerAdvertiseCommands(program: Command): void {
           quantity: opts.quantity,
           recurring: opts.recurring || false,
           recurringNote: opts.recurringNote,
-          currency: "USD",
+          currency: opts.currency?.toUpperCase() || "USD",
           addressId: opts.address,
         };
 
