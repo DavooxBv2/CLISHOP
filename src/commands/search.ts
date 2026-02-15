@@ -28,7 +28,6 @@ export interface Product {
   shippingPriceInCents?: number;
   freeShipping: boolean;
   shippingDays?: number;
-  shippingSpeed?: string;
   stockQuantity?: number;
   backorder: boolean;
   freeReturns: boolean;
@@ -57,6 +56,13 @@ function renderStars(rating: number): string {
   return "★".repeat(full) + (half ? "½" : "") + "☆".repeat(empty);
 }
 
+function deliveryLabel(days: number): string {
+  if (days <= 0) return "Same-day";
+  if (days === 1) return "Next-day";
+  if (days === 2) return "2-day";
+  return `${days}-day`;
+}
+
 export function registerSearchCommands(program: Command): void {
   // ── SEARCH ─────────────────────────────────────────────────────────
   program
@@ -82,7 +88,6 @@ export function registerSearchCommands(program: Command): void {
     .option("--ship-to <address>", "Address profile label or ID (for context)")
     .option("--deliver-by <date>", "Need delivery by date (YYYY-MM-DD)")
     .option("--max-delivery-days <days>", "Maximum delivery/transit days", parseInt)
-    .option("--shipping-speed <speed>", "Shipping speed: same-day, next-day, 2-day, standard")
 
     // Availability
     .option("--in-stock", "Only show in-stock items")
@@ -102,7 +107,7 @@ export function registerSearchCommands(program: Command): void {
 
     // Rating / sorting / pagination
     .option("--min-rating <rating>", "Minimum product rating (1-5)", parseFloat)
-    .option("-s, --sort <field>", "Sort by: price, rating, relevance, newest, shipping", "relevance")
+    .option("-s, --sort <field>", "Sort by: price, rating, relevance, newest, delivery", "relevance")
     .option("--order <dir>", "Sort order: asc, desc", "desc")
     .option("-p, --page <page>", "Page number", parseInt, 1)
     .option("-n, --per-page <count>", "Results per page", parseInt, 20)
@@ -142,7 +147,6 @@ export function registerSearchCommands(program: Command): void {
             freeShipping: opts.freeShipping || undefined,
             // Delivery
             maxDeliveryDays: maxDeliveryDays,
-            shippingSpeed: opts.shippingSpeed,
             // Availability
             inStock: opts.inStock || undefined,
             excludeBackorder: opts.excludeBackorder || undefined,
@@ -197,11 +201,9 @@ export function registerSearchCommands(program: Command): void {
             : p.shippingPriceInCents != null
               ? chalk.dim(`+${formatPrice(p.shippingPriceInCents, p.currency)} shipping`)
               : "";
-          const deliveryInfo = p.shippingSpeed
-            ? chalk.dim(`(${p.shippingSpeed})`)
-            : p.shippingDays
-              ? chalk.dim(`(${p.shippingDays}d)`)
-              : "";
+          const deliveryInfo = p.shippingDays != null
+            ? chalk.dim(`(${deliveryLabel(p.shippingDays)})`)
+            : "";
 
           // Store trust badge
           const storeBadge = p.storeVerified ? chalk.green(" ✓") : "";
@@ -295,8 +297,7 @@ export function registerSearchCommands(program: Command): void {
         console.log(`  Status:   ${status}${p.stockQuantity != null ? chalk.dim(` (${p.stockQuantity} available)`) : ""}`);
 
         // Delivery
-        if (p.shippingSpeed) console.log(`  Speed:    ${p.shippingSpeed}`);
-        if (p.shippingDays) console.log(`  Delivery: ~${p.shippingDays} days`);
+        if (p.shippingDays != null) console.log(`  Delivery: ${deliveryLabel(p.shippingDays)}`);
 
         // Rating
         console.log(`  Rating:   ${chalk.yellow(renderStars(p.rating))} ${chalk.dim(`(${p.reviewCount} reviews)`)}`);
