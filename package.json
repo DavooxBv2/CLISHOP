@@ -1,0 +1,47 @@
+{
+  "name": "@clishop/cli",
+  "version": "0.1.0",
+  "description": "CLISHOP — Order anything from your terminal",
+  "main": "dist/index.js",
+  "bin": {
+    "clishop": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --target node18",
+    "dev": "ts-node --esm src/index.ts",
+    "start": "node dist/index.js",
+    "lint": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DavooxBv2/CLISHOP.git"
+  },
+  "keywords": ["cli", "shopping", "ordering"],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "bugs": {
+    "url": "https://github.com/DavooxBv2/CLISHOP/issues"
+  },
+  "homepage": "https://github.com/DavooxBv2/CLISHOP#readme",
+  "dependencies": {
+    "axios": "^1.13.5",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
+    "conf": "^15.1.0",
+    "inquirer": "^13.2.4",
+    "keytar": "^7.9.0",
+    "ora": "^9.3.0"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.9",
+    "@types/keytar": "^4.4.0",
+    "@types/node": "^25.2.3",
+    "ts-node": "^10.9.2",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  }
+}
