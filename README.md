@@ -1,163 +1,333 @@
-CLISHOP (CLI)
+# CLISHOP CLI
 
-This repository contains the CLISHOP command-line interface.
+**CLISHOP** is a command-line shopping tool. Users search, browse, and buy products from multiple stores — all from the terminal. A single checkout covers items across stores.
 
-The CLI is the primary tool for buyers to:
+- **Package**: `@clishop/cli`
+- **Binary**: `clishop`
+- **Runtime**: Node.js ≥ 18
+- **Backend**: `https://clishop-backend.vercel.app/api`
 
-authenticate to CLISHOP,
+---
 
-manage ordering-related profile data (as supported by the platform),
-
-search/quote/buy items through CLISHOP's backend,
-
-view order history and track shipments,
-
-get a consistent, scriptable interface to ordering workflows.
-
-The CLI is a client. It does not own the database, vendor integrations, or order orchestration logic. It talks to CLISHOP-BACKEND over HTTPS APIs.
-
-## Quick Start
+## Install
 
 ```bash
-# Install dependencies
+npm install -g @clishop/cli
+```
+
+Or from source:
+
+```bash
+git clone https://github.com/DavooxBv2/CLISHOP.git
+cd CLISHOP
 npm install
-
-# Build the CLI
 npm run build
-
-# Run it
-node dist/index.js --help
-
-# Or link it globally
-npm link
-clishop --help
+npm link        # makes "clishop" available globally
 ```
 
-## Commands
+## First Run
 
-```
-clishop login           Log in to your CLISHOP account
-clishop register        Create a new CLISHOP account
-clishop logout          Log out
-clishop whoami          Show current user
+Running `clishop` with no arguments triggers a guided setup wizard if the user hasn't completed setup. The wizard walks through:
 
-clishop agent list      List all agents
-clishop agent create    Create a new agent (safety profile)
-clishop agent use       Switch the active agent
-clishop agent show      Show agent details
-clishop agent update    Update agent settings
-clishop agent delete    Delete an agent
+1. Account creation or login
+2. Agent configuration (optional — a default agent is created automatically)
+3. Shipping address
+4. Payment method (opens a secure browser link)
+5. First product search
 
-clishop address list    List addresses for the active agent
-clishop address add     Add a new address
-clishop address remove  Remove an address
-clishop address set-default  Set default address
+The wizard can also be re-run at any time:
 
-clishop payment list    List payment methods
-clishop payment add     Add a payment method (opens browser)
-clishop payment remove  Remove a payment method
-clishop payment set-default  Set default payment
-
-clishop search <query>  Search for products
-clishop product <id>    View product details
-
-clishop buy <productId> Quick-buy a product
-clishop order list      List your orders
-clishop order show <id> Show order details
-clishop order cancel    Cancel an order
-
-clishop review add      Write a product review
-clishop review list     List your reviews
-clishop review delete   Delete a review
-
-clishop config show     Show configuration
-clishop config set-api-url  Set backend URL
-clishop config set-output   Set output format
-clishop config reset    Reset configuration
-```
-
-## Agents
-
-Agents are safety profiles for ordering. Every user has a "default" agent.
-Each agent has its own:
-
-- Max order amount (safety limit)
-- Allowed/blocked product categories
-- Default shipping address
-- Default payment method
-- Confirmation requirement
-
-Use `--agent <name>` on any command to use a specific agent for that invocation.
-
-## Configuration
-
-Config is stored locally at `~/.config/clishop/config.json` (or platform equivalent).
-Auth tokens are stored securely in the OS keychain via `keytar`.
-
-Set the backend URL:
 ```bash
-clishop config set-api-url https://api.clishop.dev/api
+clishop setup
 ```
 
-## What this repo is responsible for
-Buyer experience in the terminal
+---
 
-A fast, ergonomic command set for ordering workflows
+## Authentication
 
-Human-friendly interactive output (and optional JSON output for scripting)
+All commands except `--help`, `--version`, `register`, `login`, `config`, and `setup` require authentication.
 
-Clear confirmation prompts and safety messaging before irreversible actions
+Auth tokens are stored in the OS keychain via `keytar`. Refresh tokens are rotated automatically on expiry.
 
-A consistent UX across platforms (macOS/Linux/Windows, as supported)
+```bash
+clishop register                          # interactive: name, email, password
+clishop login                             # interactive: email, password
+clishop login -e user@example.com -p pass # non-interactive
+clishop logout                            # clears local tokens
+clishop whoami                            # prints current user name, email, id
+```
 
-Authentication and session handling
+### Non-interactive auth (for scripts / AI agents)
 
-Provides a login flow that authenticates the user with the CLISHOP platform
+```bash
+clishop login --email <email> --password <password>
+```
 
-Maintains a local authenticated session (token handling and refresh as applicable)
+Both `-e` / `--email` and `-p` / `--password` flags are supported. If either is omitted, the CLI will prompt interactively.
 
-Supports logout and account/session inspection
+---
 
-Note: authentication details (OIDC/device flow/etc.) are platform decisions owned by the backend. The CLI implements the client-side portion.
+## Concepts
 
-API client usage
+### Agents
 
-The CLI calls CLISHOP-BACKEND endpoints to:
+Agents are **safety profiles** that control ordering behavior. Every user has a `default` agent created at registration.
 
-search and retrieve offers
+Each agent has:
+- `maxOrderAmount` — spending cap per order (in dollars)
+- `requireConfirmation` — whether to prompt before placing an order
+- `allowedCategories` / `blockedCategories` — category restrictions
+- `defaultAddressId` — default shipping address
+- `defaultPaymentMethodId` — default payment method
 
-request quotes
+Use `--agent <name>` on any command to override the active agent for that invocation:
 
-place orders
+```bash
+clishop search headphones --agent work
+clishop buy prod_xxx --agent work
+```
 
-fetch order status and history
+### Stores
 
-fetch tracking updates
+Products belong to stores (vendors). Stores are first-class entities with their own IDs (`stor_xxx`). The CLI displays the store name alongside products.
 
-The CLI should never talk directly to vendor systems.
+### IDs
 
-Local configuration
+All entities use short, prefixed IDs:
 
-Stores non-sensitive CLI preferences (output format, default address/profile, etc.)
+| Prefix | Entity          | Example            |
+|--------|-----------------|--------------------|
+| `prod_` | Product        | `prod_a8k3m2x9p4w1` |
+| `ordr_` | Order          | `ordr_b7n4q1y8t3v6` |
+| `addr_` | Address        | `addr_c9j2w5r8m1k4` |
+| `pymt_` | Payment method | `pymt_d3f8k1n7p2q9` |
+| `stor_` | Store          | `stor_e4g7j2m8r5t1` |
+| `user_` | User           | `user_f5h8k3n9s6v2` |
+| `agnt_` | Agent          | `agnt_g6j9l4p1t7w3` |
+| `chkt_` | Checkout       | `chkt_h7k1m5q2u8x4` |
 
-Keeps secrets/tokens in the platform-appropriate secure store (where applicable)
+### Money
 
-Supports configuration via environment variables for automation
+All prices are stored and returned in **cents** (integer). The CLI converts to dollars for display. Example: `7999` = `$79.99`.
 
-What this repo is not responsible for
+---
 
-Storing or managing the source-of-truth order database
+## Command Reference
 
-Implementing vendor integrations/connectors
+### Search & Browse
 
-Handling payment card data (the CLI should never collect raw card details)
+```bash
+clishop search <query>                    # search for products
+clishop search <query> --json             # output raw JSON
+clishop search <query> -c Electronics     # filter by category
+clishop search <query> --vendor AudioTech # filter by store/vendor
+clishop search <query> --min-price 1000   # min price in cents
+clishop search <query> --max-price 10000  # max price in cents
+clishop search <query> --min-rating 4     # minimum star rating (1-5)
+clishop search <query> --in-stock         # only in-stock items
+clishop search <query> -s price --order asc  # sort by price ascending
+clishop search <query> -p 2 -n 10        # page 2, 10 results per page
 
-Running background order workflows (that happens in CLISHOP-BACKEND)
+clishop product <productId>               # view product details
+clishop product <productId> --json        # raw JSON output
+```
 
-Relationship to other CLISHOP repositories
+**Sort options** (`-s`): `price`, `rating`, `relevance`, `newest`
 
-CLISHOP-BACKEND: the API + orchestration service the CLI calls
+### Ordering
 
-CLISHOP-WEB: the website/dashboard for users and (optionally) vendor portal UI
+```bash
+clishop buy <productId>                   # quick-buy with defaults
+clishop buy <productId> -q 3             # buy quantity 3
+clishop buy <productId> --address <id>   # specify shipping address
+clishop buy <productId> --payment <id>   # specify payment method
+clishop buy <productId> -y               # skip confirmation prompt
+clishop buy <productId> --agent work     # use a specific agent
 
-CLISHOP-VENDORSDK: tools and SDK for vendors integrating with CLISHOP
+clishop order list                        # list your orders
+clishop order list --status pending       # filter by status
+clishop order list --json                 # raw JSON
+clishop order show <orderId>              # order details + tracking
+clishop order show <orderId> --json
+clishop order cancel <orderId>            # cancel an order (interactive confirm)
+```
+
+**Order statuses**: `pending`, `confirmed`, `processing`, `shipped`, `delivered`, `cancelled`
+
+The `buy` command:
+1. Fetches product info
+2. Checks agent safety limits (max amount, category restrictions)
+3. Shows a confirmation prompt (unless `-y` or agent has `requireConfirmation: false`)
+4. Creates a checkout + order on the backend
+5. Returns the order ID
+
+### Agents
+
+```bash
+clishop agent list                        # list all agents (active marked with ●)
+clishop agent show                        # show active agent details
+clishop agent show <name>                 # show specific agent
+clishop agent create <name>               # interactive: create a new agent
+clishop agent create <name> --max-amount 1000  # set max order amount ($)
+clishop agent create <name> --no-confirm  # don't require order confirmation
+clishop agent use <name>                  # switch active agent
+clishop agent update <name>               # interactive: update agent settings
+clishop agent delete <name>               # delete an agent (cannot delete "default")
+```
+
+### Addresses
+
+Addresses are scoped to the active agent.
+
+```bash
+clishop address list                      # list addresses for active agent
+clishop address add                       # interactive: add an address
+clishop address remove <addressId>        # remove (soft-delete) an address
+clishop address set-default <addressId>   # set default address for active agent
+```
+
+Address fields when adding:
+- **Label**: e.g. "Home", "Office"
+- **Street name and number**: e.g. "123 Main St"
+- **Apartment/suite** (optional)
+- **Postal / ZIP code**
+- **City**
+- **State / Province / Region** (optional — supports international addresses)
+- **Country**
+
+### Payment Methods
+
+Payment methods are scoped to the active agent. The CLI never collects card details — it opens a secure browser link.
+
+```bash
+clishop payment list                      # list payment methods for active agent
+clishop payment add                       # get a secure setup link (opens browser)
+clishop payment remove <paymentId>        # remove (soft-delete) a payment method
+clishop payment set-default <paymentId>   # set default payment for active agent
+```
+
+### Reviews
+
+```bash
+clishop review add <productId>            # interactive: write a review (rating, title, body)
+clishop review list                       # list your reviews
+clishop review list --json                # raw JSON
+clishop review delete <reviewId>          # delete a review
+```
+
+### Configuration
+
+```bash
+clishop config show                       # show current config (active agent, output format, path)
+clishop config set-output human           # set output format to human-readable
+clishop config set-output json            # set output format to JSON
+clishop config reset                      # reset all config to defaults
+clishop config path                       # print config file path
+```
+
+### Setup
+
+```bash
+clishop setup                             # run the first-time setup wizard
+```
+
+---
+
+## Non-Interactive Usage (for AI Agents & Scripts)
+
+The CLI is designed to work in automated/scripted environments:
+
+### Login without prompts
+
+```bash
+clishop login -e <email> -p <password>
+```
+
+### Skip order confirmation
+
+```bash
+clishop buy <productId> -y
+```
+
+### JSON output for parsing
+
+```bash
+clishop search headphones --json
+clishop order list --json
+clishop order show <orderId> --json
+clishop product <productId> --json
+clishop review list --json
+```
+
+### Typical automated workflow
+
+```bash
+# 1. Authenticate
+clishop login -e user@example.com -p mypassword
+
+# 2. Search for a product
+clishop search "wireless headphones" --json
+
+# 3. View product details (use a product ID from search results)
+clishop product prod_a8k3m2x9p4w1 --json
+
+# 4. Buy it (skip confirmation)
+clishop buy prod_a8k3m2x9p4w1 -y
+
+# 5. Check order status
+clishop order list --json
+```
+
+### Using a specific agent
+
+```bash
+clishop buy prod_xxx --agent work -y
+```
+
+### Exit codes
+
+- `0` — success
+- `1` — error (auth failure, not found, validation error, API error)
+
+Errors are printed to stderr. On failure, check the error message for details.
+
+---
+
+## Configuration Storage
+
+| Data | Location |
+|------|----------|
+| CLI config (agents, preferences) | `~/.config/clishop/config.json` (or OS equivalent) |
+| Auth tokens | OS keychain (via `keytar`) |
+
+The config file path can be found with:
+
+```bash
+clishop config path
+```
+
+---
+
+## Environment Variables
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `CLISHOP_API_URL` | Override the backend API URL | `https://clishop-backend.vercel.app/api` |
+
+---
+
+## Architecture
+
+```
+CLISHOP CLI (this repo)
+  │
+  ├── Calls CLISHOP-BACKEND over HTTPS
+  │     └── https://clishop-backend.vercel.app/api
+  │
+  ├── Stores config locally (conf)
+  │     └── ~/.config/clishop/config.json
+  │
+  └── Stores auth tokens in OS keychain (keytar)
+```
+
+The CLI is a pure client. It does not own the database, vendor integrations, or order orchestration. All data operations go through the backend API.
