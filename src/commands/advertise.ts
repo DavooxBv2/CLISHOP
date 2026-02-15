@@ -20,6 +20,7 @@ export interface AdvertiseRequest {
   bidPriceInCents?: number;
   currency: string;
   speedDays?: number;
+  paymentMethods?: string; // "all" or JSON array of payment method IDs
   address?: {
     id: string;
     label: string;
@@ -243,6 +244,47 @@ export function registerAdvertiseCommands(program: Command): void {
           console.log(chalk.dim("  Could not fetch addresses. Skipping delivery location."));
         }
 
+        // Payment method selection
+        let paymentMethods: string | undefined;
+
+        const paySpinner = ora("Fetching your payment methods...").start();
+        try {
+          const payRes = await api.get("/payment-methods", { params: { agent: agent.name } });
+          paySpinner.stop();
+          const payments = payRes.data.paymentMethods;
+
+          if (payments.length > 0) {
+            const payChoices = [
+              { name: chalk.green("Accept all payment methods"), value: "__ALL__" },
+              ...payments.map((p: any) => ({
+                name: `${p.label}${p.brand ? ` (${p.brand})` : ""}`,
+                value: p.id,
+                checked: true, // Default: all user's payment methods selected
+              })),
+            ];
+
+            const { selectedPayments } = await inquirer.prompt([
+              {
+                type: "checkbox",
+                name: "selectedPayments",
+                message: "Accepted payment methods:",
+                choices: payChoices,
+              },
+            ]);
+
+            if (selectedPayments.includes("__ALL__")) {
+              paymentMethods = "all";
+            } else if (selectedPayments.length > 0) {
+              paymentMethods = JSON.stringify(selectedPayments);
+            }
+          } else {
+            console.log(chalk.dim("  No payment methods found. You can add one later with: clishop payment add"));
+          }
+        } catch {
+          paySpinner.stop();
+          console.log(chalk.dim("  Could not fetch payment methods. Skipping."));
+        }
+
         // Build the request body
         const body: any = {
           title: answers.title,
@@ -255,6 +297,7 @@ export function registerAdvertiseCommands(program: Command): void {
           recurring: answers.recurring,
           recurringNote,
           currency,
+          paymentMethods,
           addressId,
         };
 
@@ -297,9 +340,24 @@ export function registerAdvertiseCommands(program: Command): void {
     .option("--bid-price <price>", "Max bid price", parseFloat)
     .option("--currency <code>", "Currency code (default: USD)")
     .option("--speed <days>", "Desired delivery days", parseInt)
+    .option("--payment-methods <methods>", 'Payment methods: "all" or comma-separated IDs')
     .option("--address <id>", "Address ID for delivery")
     .action(async (title: string, opts) => {
       try {
+        // Process payment methods
+        let paymentMethods: string | undefined;
+        if (opts.paymentMethods) {
+          if (opts.paymentMethods.toLowerCase() === "all") {
+            paymentMethods = "all";
+          } else {
+            // Convert comma-separated IDs to JSON array
+            const ids = opts.paymentMethods.split(",").map((id: string) => id.trim()).filter(Boolean);
+            if (ids.length > 0) {
+              paymentMethods = JSON.stringify(ids);
+            }
+          }
+        }
+
         const body: any = {
           title,
           description: opts.description,
@@ -311,6 +369,7 @@ export function registerAdvertiseCommands(program: Command): void {
           recurring: opts.recurring || false,
           recurringNote: opts.recurringNote,
           currency: opts.currency?.toUpperCase() || "USD",
+          paymentMethods,
           addressId: opts.address,
         };
 
@@ -432,6 +491,18 @@ export function registerAdvertiseCommands(program: Command): void {
         if (ad.address) {
           const a = ad.address;
           console.log(`  Deliver to: ${a.label} — ${a.line1 || ""}${a.city ? `, ${a.city}` : ""}${a.region ? `, ${a.region}` : ""} ${a.postalCode || ""}, ${a.country || ""}`);
+        }
+        if (ad.paymentMethods) {
+          if (ad.paymentMethods === "all") {
+            console.log(`  Payment:  ${chalk.green("All methods accepted")}`);
+          } else {
+            try {
+              const ids = JSON.parse(ad.paymentMethods);
+              console.log(`  Payment:  ${ids.length} method${ids.length > 1 ? "s" : ""} configured`);
+            } catch {
+              console.log(`  Payment:  ${ad.paymentMethods}`);
+            }
+          }
         }
         if (ad.expiresAt) console.log(`  Expires:  ${new Date(ad.expiresAt).toLocaleString()}`);
         console.log(`  Created:  ${new Date(ad.createdAt).toLocaleString()}`);
