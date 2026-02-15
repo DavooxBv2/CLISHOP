@@ -31,6 +31,8 @@ export interface AppConfig {
   apiBaseUrl: string;
   /** Output format */
   outputFormat: "human" | "json";
+  /** Whether the first-run setup wizard has been completed */
+  setupCompleted: boolean;
 }
 
 const DEFAULT_AGENT: AgentConfig = {
@@ -50,6 +52,7 @@ const config = new Conf<AppConfig>({
     },
     apiBaseUrl: process.env.CLISHOP_API_URL || "http://localhost:4000/api",
     outputFormat: "human",
+    setupCompleted: false,
   },
 });
 

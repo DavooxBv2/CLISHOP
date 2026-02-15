@@ -10,6 +10,7 @@ import { registerSearchCommands } from "./commands/search.js";
 import { registerOrderCommands } from "./commands/order.js";
 import { registerReviewCommands } from "./commands/review.js";
 import { registerConfigCommands } from "./commands/config.js";
+import { registerSetupCommand, runSetupWizard } from "./commands/setup.js";
 import { getConfig } from "./config.js";
 
 const program = new Command();
@@ -46,9 +47,26 @@ registerSearchCommands(program);
 registerOrderCommands(program);
 registerReviewCommands(program);
 registerConfigCommands(program);
+registerSetupCommand(program);
 
-// Parse and run
-program.parseAsync(process.argv).catch((err) => {
+// Main entry with first-run detection
+async function main() {
+  const hasSubcommand = process.argv.length > 2;
+
+  // If the user just types "clishop" with no arguments and hasn't
+  // completed setup yet, start the onboarding wizard automatically.
+  if (!hasSubcommand) {
+    const config = getConfig();
+    if (!config.get("setupCompleted")) {
+      await runSetupWizard();
+      return;
+    }
+  }
+
+  await program.parseAsync(process.argv);
+}
+
+main().catch((err) => {
   console.error(chalk.red(err.message));
   process.exit(1);
 });
