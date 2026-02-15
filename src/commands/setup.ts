@@ -107,7 +107,7 @@ export async function runSetupWizard(): Promise<void> {
   if (!loggedIn) {
     const { authChoice } = await inquirer.prompt([
       {
-        type: "list",
+        type: "select",
         name: "authChoice",
         message: "Do you have a CLISHOP account?",
         choices: [

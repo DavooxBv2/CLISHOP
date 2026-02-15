@@ -31,7 +31,7 @@ export function registerReviewCommands(program: Command): void {
       try {
         const answers = await inquirer.prompt([
           {
-            type: "list",
+            type: "select",
             name: "rating",
             message: "Rating:",
             choices: [
