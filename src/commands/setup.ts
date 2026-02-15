@@ -226,52 +226,30 @@ export async function runSetupWizard(): Promise<void> {
   // STEP 2 — Agent
   // ════════════════════════════════════════════════════════════════════
 
-  stepHeader(2, 5, "Agent");
-
-  console.log(
-    chalk.dim(
-      "  Agents are safety profiles for ordering. Each agent has its own"
-    )
-  );
-  console.log(
-    chalk.dim(
-      "  spending limits, allowed categories, and confirmation settings."
-    )
-  );
-  console.log();
-  console.log(
-    chalk.dim(
-      "  A default agent is already created for you — you don't need to"
-    )
-  );
-  console.log(
-    chalk.dim(
-      "  set one up now. You can always create more agents later."
-    )
-  );
-  console.log();
+  stepHeader(2, 5, "Agent (optional)");
 
   const activeAgent = getActiveAgent();
 
+  console.log(
+    chalk.dim(
+      `  A default agent is ready ($${activeAgent.maxOrderAmount} limit, confirmation on).`
+    )
+  );
+  console.log(
+    chalk.dim("  Agents control spending limits and category restrictions.")
+  );
+  console.log();
+
   const { agentChoice } = await inquirer.prompt([
     {
-      type: "list",
+      type: "confirm",
       name: "agentChoice",
-      message: "What would you like to do?",
-      choices: [
-        {
-          name: `Skip — use the default agent ($${activeAgent.maxOrderAmount} limit, confirmation required)`,
-          value: "default",
-        },
-        {
-          name: "Create a custom agent with your own settings",
-          value: "custom",
-        },
-      ],
+      message: "Configure a custom agent?",
+      default: false,
     },
   ]);
 
-  if (agentChoice === "custom") {
+  if (agentChoice) {
     const answers = await inquirer.prompt([
       {
         type: "input",
@@ -309,11 +287,7 @@ export async function runSetupWizard(): Promise<void> {
       console.log(chalk.dim("  Continuing with the default agent."));
     }
   } else {
-    console.log(chalk.green("\n  ✓ All good — using the default agent."));
-    console.log(
-      chalk.dim("  You can create custom agents later with: ") +
-        chalk.white("clishop agent create <name>")
-    );
+    console.log(chalk.green("  ✓ Using default agent."));
   }
 
   // ════════════════════════════════════════════════════════════════════
