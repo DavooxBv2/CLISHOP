@@ -219,11 +219,21 @@ export function registerAdvertiseCommands(program: Command): void {
           const addresses = addrRes.data.addresses;
 
           if (addresses.length > 0) {
-            const addrChoices = addresses.map((a: any) => ({
-              name: `${a.label} — ${a.line1}`,
-              value: a.id,
-            }));
-            addrChoices.push({ name: chalk.dim("Skip — don't set a delivery address"), value: "" });
+            // Build display names and map to IDs
+            const addrMap = new Map<string, string>();
+            const addrChoices: { name: string; value: string }[] = [];
+            
+            for (const a of addresses) {
+              const displayName = `${a.label} — ${a.line1}`;
+              addrMap.set(displayName, a.id);
+              addrChoices.push({ name: displayName, value: displayName });
+            }
+            const skipOption = "Skip — don't set a delivery address";
+            addrChoices.push({ name: chalk.dim(skipOption), value: skipOption });
+
+            // Find default display name
+            const defaultAddr = addresses.find((a: any) => a.id === agent.defaultAddressId);
+            const defaultDisplay = defaultAddr ? `${defaultAddr.label} — ${defaultAddr.line1}` : "";
 
             const { selectedAddress } = await inquirer.prompt([
               {
@@ -231,10 +241,12 @@ export function registerAdvertiseCommands(program: Command): void {
                 name: "selectedAddress",
                 message: "Delivery location:",
                 choices: addrChoices,
-                default: agent.defaultAddressId || "",
+                default: defaultDisplay,
               },
             ]);
-            addressId = selectedAddress || undefined;
+            
+            // Look up the ID from the selected display name
+            addressId = addrMap.get(selectedAddress) || undefined;
           } else {
             addrSpinner.stop();
             console.log(chalk.dim("  No addresses found. You can add one later with: clishop address add"));
