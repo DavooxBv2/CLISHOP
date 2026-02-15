@@ -179,7 +179,7 @@ export function registerAdvertiseCommands(program: Command): void {
 
           if (addresses.length > 0) {
             const addrChoices = addresses.map((a: any) => ({
-              name: `${a.label} — ${a.line1}, ${a.city}${a.region ? `, ${a.region}` : ""} ${a.postalCode}, ${a.country}`,
+              name: `${a.label} — ${a.line1}`,
               value: a.id,
             }));
             addrChoices.push({ name: chalk.dim("Skip — don't set a delivery address"), value: "" });
