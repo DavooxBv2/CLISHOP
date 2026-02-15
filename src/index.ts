@@ -13,6 +13,7 @@ import { registerConfigCommands } from "./commands/config.js";
 import { registerStoreCommands } from "./commands/store.js";
 import { registerStatusCommand } from "./commands/status.js";
 import { registerSetupCommand, runSetupWizard } from "./commands/setup.js";
+import { registerAdvertiseCommands } from "./commands/advertise.js";
 import { getConfig } from "./config.js";
 
 const program = new Command();
@@ -52,6 +53,7 @@ registerConfigCommands(program);
 registerStoreCommands(program);
 registerStatusCommand(program);
 registerSetupCommand(program);
+registerAdvertiseCommands(program);
 
 // Main entry with first-run detection
 async function main() {

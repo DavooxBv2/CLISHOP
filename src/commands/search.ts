@@ -179,6 +179,15 @@ export function registerSearchCommands(program: Command): void {
 
         if (result.products.length === 0) {
           console.log(chalk.yellow(`\nNo results found for "${query}".`));
+          console.log(
+            chalk.dim("\n  💡 Tip: ") +
+            chalk.white("Can't find what you need? Advertise your request and let vendors come to you!") +
+            chalk.dim(`\n         Run: `) +
+            chalk.cyan(`clishop advertise create`) +
+            chalk.dim(` or `) +
+            chalk.cyan(`clishop advertise quick "${query}"`) +
+            chalk.dim("\n")
+          );
           return;
         }
 
@@ -239,6 +248,19 @@ export function registerSearchCommands(program: Command): void {
         const totalPages = Math.ceil(result.total / result.pageSize);
         if (totalPages > 1) {
           console.log(chalk.dim(`  Page ${result.page} of ${totalPages}. Use --page to navigate.\n`));
+        }
+
+        // Show advertise tip on the last page of results
+        if (result.page >= totalPages) {
+          console.log(
+            chalk.dim("  💡 Tip: ") +
+            chalk.white("Didn't find the right match? Advertise your request for vendors to bid on.") +
+            chalk.dim(`\n         Run: `) +
+            chalk.cyan(`clishop advertise create`) +
+            chalk.dim(` or `) +
+            chalk.cyan(`clishop advertise quick "${query}"`) +
+            chalk.dim("\n")
+          );
         }
       } catch (error) {
         handleApiError(error);
