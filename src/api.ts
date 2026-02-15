@@ -1,6 +1,5 @@
 import axios, { AxiosInstance, AxiosError } from "axios";
 import chalk from "chalk";
-import { getConfig } from "./config.js";
 import { getToken, getRefreshToken, storeToken } from "./auth.js";
 
 let client: AxiosInstance | null = null;
@@ -9,11 +8,12 @@ let client: AxiosInstance | null = null;
  * Get an authenticated Axios client that talks to the backend.
  * Automatically attaches the Bearer token and handles 401 refresh.
  */
+const API_BASE_URL = "https://clishop-backend.vercel.app/api";
+
 export function getApiClient(): AxiosInstance {
   if (client) return client;
 
-  const config = getConfig();
-  const baseUrl = config.get("apiBaseUrl");
+  const baseUrl = API_BASE_URL;
 
   client = axios.create({
     baseURL: baseUrl,

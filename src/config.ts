@@ -50,7 +50,7 @@ const config = new Conf<AppConfig>({
     agents: {
       default: DEFAULT_AGENT,
     },
-    apiBaseUrl: process.env.CLISHOP_API_URL || "http://localhost:4000/api",
+    apiBaseUrl: "https://clishop-backend.vercel.app/api",
     outputFormat: "human",
     setupCompleted: false,
   },
