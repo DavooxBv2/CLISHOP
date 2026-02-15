@@ -10,6 +10,7 @@ import { registerSearchCommands } from "./commands/search.js";
 import { registerOrderCommands } from "./commands/order.js";
 import { registerReviewCommands } from "./commands/review.js";
 import { registerConfigCommands } from "./commands/config.js";
+import { registerStoreCommands } from "./commands/store.js";
 import { registerSetupCommand, runSetupWizard } from "./commands/setup.js";
 import { getConfig } from "./config.js";
 
@@ -47,6 +48,7 @@ registerSearchCommands(program);
 registerOrderCommands(program);
 registerReviewCommands(program);
 registerConfigCommands(program);
+registerStoreCommands(program);
 registerSetupCommand(program);
 
 // Main entry with first-run detection

@@ -8,7 +8,7 @@ let client: AxiosInstance | null = null;
  * Get an authenticated Axios client that talks to the backend.
  * Automatically attaches the Bearer token and handles 401 refresh.
  */
-const API_BASE_URL = "https://clishop-backend.vercel.app/api";
+const API_BASE_URL = process.env.CLISHOP_API_URL || "https://clishop-backend.vercel.app/api";
 
 export function getApiClient(): AxiosInstance {
   if (client) return client;
