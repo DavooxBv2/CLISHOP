@@ -112,6 +112,10 @@ export function registerSearchCommands(program: Command): void {
     .option("-p, --page <page>", "Page number", parseInt, 1)
     .option("-n, --per-page <count>", "Results per page", parseInt, 20)
 
+    // Extended search
+    .option("-e, --extended-search", "Enable extended search: query darkstores when no local results found")
+    .option("--extended-timeout <seconds>", "Extended search timeout in seconds (default: 20, max: 60)", parseInt)
+
     // Output
     .option("--json", "Output raw JSON")
 
@@ -127,6 +131,19 @@ export function registerSearchCommands(program: Command): void {
           const now = new Date();
           const diff = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
           if (diff > 0) maxDeliveryDays = diff;
+        }
+
+        // Extended search: clamp timeout to 5-60s
+        const extendedSearch = opts.extendedSearch || false;
+        const extendedTimeout = opts.extendedTimeout
+          ? Math.min(60, Math.max(5, opts.extendedTimeout))
+          : 20;
+
+        // If extended search is enabled, increase the HTTP timeout to match
+        const httpTimeout = extendedSearch ? (extendedTimeout + 5) * 1000 : 15000;
+
+        if (extendedSearch) {
+          spinner.text = `Searching for "${query}" (extended search: ${extendedTimeout}s timeout)...`;
         }
 
         const res = await api.get("/products/search", {
@@ -166,7 +183,11 @@ export function registerSearchCommands(program: Command): void {
             order: opts.order,
             page: opts.page,
             pageSize: opts.perPage,
+            // Extended search
+            extendedSearch: extendedSearch || undefined,
+            extendedTimeout: extendedSearch ? extendedTimeout : undefined,
           },
+          timeout: httpTimeout,
         });
         spinner.stop();
 
@@ -177,23 +198,47 @@ export function registerSearchCommands(program: Command): void {
           return;
         }
 
-        if (result.products.length === 0) {
+        // Check for extended search results
+        const extended = (res.data as any).extended;
+        const suggestAdvertise = (res.data as any).suggestAdvertise;
+
+        if (result.products.length === 0 && (!extended || extended.total === 0)) {
           console.log(chalk.yellow(`\nNo results found for "${query}".`));
-          console.log(
-            chalk.dim("\n  💡 Tip: ") +
-            chalk.white("Can't find what you need? Advertise your request and let vendors come to you!") +
-            chalk.dim(`\n         Run: `) +
-            chalk.cyan(`clishop advertise create`) +
-            chalk.dim(` or `) +
-            chalk.cyan(`clishop advertise quick "${query}"`) +
-            chalk.dim("\n")
-          );
+
+          if (!extendedSearch) {
+            console.log(
+              chalk.dim("\n  🔍 Tip: ") +
+              chalk.white("Try extended search to query vendor stores in real-time:") +
+              chalk.dim(`\n         Run: `) +
+              chalk.cyan(`clishop search "${query}" --extended-search`) +
+              chalk.dim("\n")
+            );
+          }
+
+          if (suggestAdvertise || !extendedSearch) {
+            console.log(
+              chalk.dim("  💡 Tip: ") +
+              chalk.white("Can't find what you need? Advertise your request and let vendors come to you!") +
+              chalk.dim(`\n         Run: `) +
+              chalk.cyan(`clishop advertise create`) +
+              chalk.dim(` or `) +
+              chalk.cyan(`clishop advertise quick "${query}"`) +
+              chalk.dim("\n")
+            );
+          }
           return;
         }
 
-        console.log(
-          chalk.bold(`\nResults for "${query}" — ${result.total} found (page ${result.page})\n`)
-        );
+        // Show local results
+        if (result.products.length > 0) {
+          console.log(
+            chalk.bold(`\nResults for "${query}" — ${result.total} found (page ${result.page})\n`)
+          );
+        } else if (extended && extended.total > 0) {
+          console.log(
+            chalk.bold(`\nNo local results for "${query}". Extended search found ${extended.total} result(s) from ${extended.storesResponded} store(s):\n`)
+          );
+        }
 
         for (const p of result.products) {
           const stock = p.inStock
@@ -250,8 +295,62 @@ export function registerSearchCommands(program: Command): void {
           console.log(chalk.dim(`  Page ${result.page} of ${totalPages}. Use --page to navigate.\n`));
         }
 
+        // ── Extended search results ───────────────────────────────────
+        if (extended && extended.products && extended.products.length > 0) {
+          if (result.products.length > 0) {
+            console.log(chalk.bold.magenta(`\n── Extended Search Results (${extended.total} from ${extended.storesResponded} store(s)) ──\n`));
+          }
+
+          for (const ep of extended.products) {
+            const stock = ep.inStock
+              ? chalk.green("In Stock")
+              : chalk.red("Out of Stock");
+            const price = chalk.bold.white(formatPrice(ep.priceInCents, ep.currency));
+
+            const shippingInfo = ep.freeShipping
+              ? chalk.green("Free Shipping")
+              : ep.shippingPriceInCents != null
+                ? chalk.dim(`+${formatPrice(ep.shippingPriceInCents, ep.currency)} shipping`)
+                : "";
+            const deliveryInfo = ep.shippingDays != null
+              ? chalk.dim(`(${deliveryLabel(ep.shippingDays)})`)
+              : "";
+
+            console.log(`  ${chalk.bold.cyan(ep.name)} ${chalk.dim(`(${ep.externalProductId})`)}`);
+            console.log(
+              `    ${price}  ${stock}` +
+              (shippingInfo ? `  ${shippingInfo}` : "") +
+              (deliveryInfo ? ` ${deliveryInfo}` : "")
+            );
+
+            const meta: string[] = [];
+            if (ep.brand) meta.push(ep.brand);
+            if (ep.variant || ep.variantLabel) meta.push(ep.variant || ep.variantLabel);
+            if (ep.storeName) meta.push(`by ${ep.storeName}`);
+            meta.push(chalk.magenta("extended"));
+            console.log(`    ${chalk.dim(meta.join(" · "))}`);
+
+            if (ep.description) {
+              console.log(`    ${ep.description.length > 120 ? ep.description.slice(0, 120) + "..." : ep.description}`);
+            }
+            console.log();
+          }
+        }
+
         // Show advertise tip on the last page of results
-        if (result.page >= totalPages) {
+        const showAdvertiseTip = result.page >= totalPages || suggestAdvertise;
+        if (showAdvertiseTip) {
+          // If no extended search was used, suggest it
+          if (!extendedSearch && result.products.length > 0) {
+            console.log(
+              chalk.dim("  🔍 Tip: ") +
+              chalk.white("Want more results? Try extended search:") +
+              chalk.dim(`\n         Run: `) +
+              chalk.cyan(`clishop search "${query}" --extended-search`) +
+              chalk.dim("\n")
+            );
+          }
+
           console.log(
             chalk.dim("  💡 Tip: ") +
             chalk.white("Didn't find the right match? Advertise your request for vendors to bid on.") +
