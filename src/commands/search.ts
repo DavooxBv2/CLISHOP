@@ -86,6 +86,7 @@ export function registerSearchCommands(program: Command): void {
 
     // Delivery
     .option("--ship-to <address>", "Address profile label or ID (for context)")
+    .option("--country <code>", "Delivery country (ISO 3166-1 alpha-2, e.g. US, BE, NL)")
     .option("--deliver-by <date>", "Need delivery by date (YYYY-MM-DD)")
     .option("--max-delivery-days <days>", "Maximum delivery/transit days", parseInt)
 
@@ -163,6 +164,7 @@ export function registerSearchCommands(program: Command): void {
             maxTotal: opts.maxTotal,
             freeShipping: opts.freeShipping || undefined,
             // Delivery
+            country: opts.country || undefined,
             maxDeliveryDays: maxDeliveryDays,
             // Availability
             inStock: opts.inStock || undefined,
