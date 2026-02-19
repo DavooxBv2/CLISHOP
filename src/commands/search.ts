@@ -16,7 +16,6 @@ export interface Product {
   storeName: string;
   storeVerified: boolean;
   storeRating: number | null;
-  storePaymentProviders?: string | null;
   rating: number;
   reviewCount: number;
   inStock: boolean;
@@ -105,7 +104,6 @@ export function registerSearchCommands(program: Command): void {
     .option("--trusted-only", "Only show products from verified stores")
     .option("--min-store-rating <rating>", "Minimum store rating (0-5)", parseFloat)
     .option("--checkout-mode <mode>", "Checkout mode: instant, handoff")
-    .option("--payment-provider <provider>", "Filter by payment provider (e.g. stripe, paypal)")
 
     // Rating / sorting / pagination
     .option("--min-rating <rating>", "Minimum product rating (1-5)", parseFloat)
@@ -162,7 +160,6 @@ export function registerSearchCommands(program: Command): void {
             trustedOnly: opts.trustedOnly || undefined,
             minStoreRating: opts.minStoreRating,
             checkoutMode: opts.checkoutMode,
-            paymentProvider: opts.paymentProvider,
             // Rating / sorting / pagination
             minRating: opts.minRating,
             sort: opts.sort,
