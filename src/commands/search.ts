@@ -84,9 +84,14 @@ export function registerSearchCommands(program: Command): void {
     .option("--max-total <price>", "Maximum landed total: item + shipping (cents)", parseInt)
     .option("--free-shipping", "Only show items with free shipping")
 
-    // Delivery
-    .option("--ship-to <address>", "Address profile label or ID (for context)")
+    // Delivery location
+    .option("--ship-to <address>", "Saved address label or ID (resolves country/city/postal automatically)")
     .option("--country <code>", "Delivery country (ISO 3166-1 alpha-2, e.g. US, BE, NL)")
+    .option("--city <city>", "Delivery city")
+    .option("--postal-code <code>", "Delivery postal/zip code")
+    .option("--region <region>", "Delivery state/province/region")
+    .option("--lat <latitude>", "Delivery latitude (for local/proximity search)", parseFloat)
+    .option("--lng <longitude>", "Delivery longitude (for local/proximity search)", parseFloat)
     .option("--deliver-by <date>", "Need delivery by date (YYYY-MM-DD)")
     .option("--max-delivery-days <days>", "Maximum delivery/transit days", parseInt)
 
@@ -134,6 +139,39 @@ export function registerSearchCommands(program: Command): void {
           if (diff > 0) maxDeliveryDays = diff;
         }
 
+        // Resolve --ship-to: if provided, fetch the saved address to extract location fields
+        let shipToCountry = opts.country || undefined;
+        let shipToCity = opts.city || undefined;
+        let shipToPostalCode = opts.postalCode || undefined;
+        let shipToRegion = opts.region || undefined;
+        let shipToLat = opts.lat || undefined;
+        let shipToLng = opts.lng || undefined;
+
+        if (opts.shipTo) {
+          try {
+            spinner.text = `Resolving address "${opts.shipTo}"...`;
+            const addrRes = await api.get("/addresses");
+            const addresses = addrRes.data.addresses || [];
+            // Match by label (case-insensitive) or by ID
+            const match = addresses.find((a: any) =>
+              a.id === opts.shipTo ||
+              (a.label && a.label.toLowerCase() === opts.shipTo.toLowerCase())
+            );
+            if (match) {
+              if (!shipToCountry) shipToCountry = match.country;
+              if (!shipToCity) shipToCity = match.city;
+              if (!shipToPostalCode) shipToPostalCode = match.postalCode;
+              if (!shipToRegion) shipToRegion = match.region;
+            } else {
+              spinner.warn(`Address "${opts.shipTo}" not found — ignoring --ship-to`);
+              spinner.start(`Searching for "${query}"...`);
+            }
+          } catch {
+            // Address lookup failed — continue without it
+          }
+          spinner.text = `Searching for "${query}"...`;
+        }
+
         // Extended search: clamp timeout to 5-60s
         const extendedSearch = opts.extendedSearch || false;
         const extendedTimeout = opts.extendedTimeout
@@ -163,8 +201,14 @@ export function registerSearchCommands(program: Command): void {
             maxShipping: opts.maxShipping,
             maxTotal: opts.maxTotal,
             freeShipping: opts.freeShipping || undefined,
-            // Delivery
-            country: opts.country || undefined,
+            // Delivery location
+            shipTo: opts.shipTo || undefined,
+            country: shipToCountry,
+            city: shipToCity,
+            postalCode: shipToPostalCode,
+            region: shipToRegion,
+            lat: shipToLat,
+            lng: shipToLng,
             maxDeliveryDays: maxDeliveryDays,
             // Availability
             inStock: opts.inStock || undefined,
