@@ -64,6 +64,16 @@ function deliveryLabel(days: number): string {
   return `${days}-day`;
 }
 
+function estimatedArrival(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function scoreOutOf10(rating: number, maxScale = 5): string {
+  return ((rating / maxScale) * 10).toFixed(1);
+}
+
 export function registerSearchCommands(program: Command): void {
   // ── SEARCH ─────────────────────────────────────────────────────────
   program
@@ -114,10 +124,13 @@ export function registerSearchCommands(program: Command): void {
 
     // Rating / sorting / pagination
     .option("--min-rating <rating>", "Minimum product rating (1-5)", parseFloat)
-    .option("-s, --sort <field>", "Sort by: price, rating, relevance, newest, delivery", "relevance")
+    .option("-s, --sort <field>", "Sort by: price, total-cost, rating, relevance, newest, delivery", "relevance")
     .option("--order <dir>", "Sort order: asc, desc", "desc")
     .option("-p, --page <page>", "Page number", parseInt, 1)
     .option("-n, --per-page <count>", "Results per page", parseInt, 10)
+
+    // Delivery shortcuts
+    .option("--express", "Only show items with 2-day or faster delivery")
 
     // Extended search
     .option("-e, --extended-search", "Enable extended search: query darkstores when no local results found")
@@ -126,6 +139,8 @@ export function registerSearchCommands(program: Command): void {
 
     // Output
     .option("--json", "Output raw JSON")
+    .option("--compact", "Compact one-line-per-result output")
+    .option("--detailed", "Show full product details inline")
 
     .action(async (query: string, opts) => {
       try {
@@ -206,6 +221,11 @@ export function registerSearchCommands(program: Command): void {
           ? Math.min(60, Math.max(5, opts.extendedTimeout))
           : 30;
 
+        // --express shortcut → max 2-day delivery
+        if (opts.express && !maxDeliveryDays) {
+          maxDeliveryDays = 2;
+        }
+
         // Build common search params (reused for both regular & extended calls)
         const searchParams: Record<string, any> = {
           q: query,
@@ -246,7 +266,7 @@ export function registerSearchCommands(program: Command): void {
           checkoutMode: opts.checkoutMode,
           // Rating / sorting / pagination
           minRating: opts.minRating,
-          sort: opts.sort,
+          sort: opts.sort === "total-cost" ? "price" : opts.sort, // backend doesn't know total-cost yet
           order: opts.order,
           page: opts.page,
           pageSize: opts.perPage,
@@ -343,97 +363,179 @@ export function registerSearchCommands(program: Command): void {
           return;
         }
 
-        // Show local results
-        if (result.products.length > 0) {
-          console.log(
-            chalk.bold(`\nResults for "${query}" — ${result.total} found (page ${result.page})\n`)
-          );
-        } else if (extended && extended.total > 0) {
-          console.log(
-            chalk.bold(`\nNo local results for "${query}". Extended search found ${extended.total} result(s) from ${extended.storesResponded} store(s):\n`)
-          );
-        }
+        // ── Merge all products for display ──────────────────────────
+        // Combine local + extended into a unified list for rendering
+        type DisplayProduct = {
+          name: string; priceInCents: number; currency: string;
+          freeShipping: boolean; shippingPriceInCents?: number | null; shippingDays?: number | null;
+          vendor: string; storeVerified?: boolean; storeRating?: number | null;
+          brand?: string | null; category?: string | null;
+          rating?: number; reviewCount?: number;
+          variant?: string | null; variantLabel?: string | null;
+          description?: string | null; id?: string;
+          isExtended?: boolean;
+        };
+
+        const allProducts: DisplayProduct[] = [];
 
         for (const p of result.products) {
-          const itemPrice = p.priceInCents;
-          const shippingPrice = p.freeShipping ? 0 : (p.shippingPriceInCents ?? 0);
-          const totalPrice = itemPrice + shippingPrice;
-          const stars = p.rating > 0 ? chalk.yellow(renderStars(p.rating)) + chalk.dim(` (${p.reviewCount})`) : "";
-          const storeBadge = p.storeVerified ? chalk.green(" ✓") : "";
-          const storeRating = p.storeRating != null ? chalk.dim(` ${(p.storeRating * 2).toFixed(1)}/10`) : "";
+          allProducts.push({
+            ...p,
+            vendor: p.vendor || p.storeName || "Unknown",
+            isExtended: false,
+          });
+        }
 
-          // Title
-          console.log(`  ${chalk.bold.cyan(p.name)}`);
-
-          // Price line: price + shipping = total
-          let priceLine = `    ${chalk.bold.white(formatPrice(itemPrice, p.currency))}`;
-          if (p.freeShipping) {
-            priceLine += chalk.green("  Free Shipping");
-          } else if (p.shippingPriceInCents != null && p.shippingPriceInCents > 0) {
-            priceLine += chalk.dim(` + ${formatPrice(shippingPrice, p.currency)} shipping`);
-            priceLine += chalk.bold(` = ${formatPrice(totalPrice, p.currency)}`);
+        if (extended?.products) {
+          for (const ep of extended.products) {
+            allProducts.push({
+              name: ep.name,
+              priceInCents: ep.priceInCents,
+              currency: ep.currency,
+              freeShipping: ep.freeShipping,
+              shippingPriceInCents: ep.shippingPriceInCents,
+              shippingDays: ep.shippingDays,
+              vendor: ep.storeName || "Unknown",
+              brand: ep.brand,
+              variant: ep.variant,
+              variantLabel: ep.variantLabel,
+              description: ep.description,
+              id: ep.id,
+              isExtended: true,
+            });
           }
-          if (p.shippingDays != null) priceLine += chalk.dim(` (${deliveryLabel(p.shippingDays)})`);
-          console.log(priceLine);
+        }
 
-          // Store & rating
-          const meta: string[] = [];
-          meta.push(`${p.vendor}${storeBadge}${storeRating}`);
-          if (p.brand) meta.push(p.brand);
-          if (p.category) meta.push(p.category);
-          if (stars) meta.push(stars);
-          console.log(`    ${chalk.dim(meta.join(" · "))}`);
+        // Client-side sort for total-cost (backend doesn't support this directly)
+        if (opts.sort === "total-cost") {
+          allProducts.sort((a, b) => {
+            const aCost = a.priceInCents + (a.freeShipping ? 0 : (a.shippingPriceInCents ?? 0));
+            const bCost = b.priceInCents + (b.freeShipping ? 0 : (b.shippingPriceInCents ?? 0));
+            return opts.order === "desc" ? bCost - aCost : aCost - bCost;
+          });
+        }
 
-          // Description (short)
-          if (p.description) {
-            console.log(`    ${chalk.dim(p.description.length > 100 ? p.description.slice(0, 100) + "..." : p.description)}`);
+        if (allProducts.length === 0) {
+          // Already handled above
+        } else {
+          // Header
+          const totalCount = result.total + (extended?.total || 0);
+          if (result.products.length > 0 && extended?.total > 0) {
+            console.log(chalk.bold(`\nResults for "${query}" — ${result.total} local + ${extended.total} from stores\n`));
+          } else if (extended?.total > 0) {
+            console.log(chalk.bold(`\nExtended search for "${query}" — ${extended.total} result(s) from ${extended.storesResponded} store(s)\n`));
+          } else {
+            console.log(chalk.bold(`\nResults for "${query}" — ${result.total} found (page ${result.page})\n`));
           }
-          console.log();
+
+          // ── Price comparison summary ──
+          if (allProducts.length >= 2) {
+            const withTotal = allProducts.map((p) => ({
+              ...p,
+              totalCost: p.priceInCents + (p.freeShipping ? 0 : (p.shippingPriceInCents ?? 0)),
+            }));
+            const cheapest = withTotal.reduce((a, b) => a.totalCost < b.totalCost ? a : b);
+            const fastest = allProducts.filter((p) => p.shippingDays != null).sort((a, b) => (a.shippingDays ?? 99) - (b.shippingDays ?? 99))[0];
+            const bestRated = allProducts.filter((p) => (p.rating ?? 0) > 0).sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))[0];
+
+            const parts: string[] = [];
+            parts.push(`${chalk.green("Best price:")} ${formatPrice(cheapest.totalCost, cheapest.currency)} at ${cheapest.vendor}`);
+            if (fastest?.shippingDays != null) {
+              parts.push(`${chalk.blue("Fastest:")} ${deliveryLabel(fastest.shippingDays)} at ${fastest.vendor}`);
+            }
+            if (bestRated?.rating) {
+              parts.push(`${chalk.yellow("Top rated:")} ${scoreOutOf10(bestRated.rating)}/10 at ${bestRated.vendor}`);
+            }
+            console.log(`  ${chalk.dim("┌")} ${parts.join(chalk.dim(" │ "))}`);
+
+            // Price range
+            const prices = withTotal.map((p) => p.totalCost);
+            const minP = Math.min(...prices);
+            const maxP = Math.max(...prices);
+            const avgP = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
+            const curr = allProducts[0].currency;
+            console.log(`  ${chalk.dim("└")} ${chalk.dim(`Price range: ${formatPrice(minP, curr)} – ${formatPrice(maxP, curr)} · Average: ${formatPrice(avgP, curr)}`)}`);
+            console.log();
+          }
+
+          // ── Render each product ──
+          for (let i = 0; i < allProducts.length; i++) {
+            const p = allProducts[i];
+            const num = i + 1;
+            const itemPrice = p.priceInCents;
+            const shippingPrice = p.freeShipping ? 0 : (p.shippingPriceInCents ?? 0);
+            const totalCost = itemPrice + shippingPrice;
+
+            // Badges
+            const badges: string[] = [];
+            if (i === 0) badges.push(chalk.bgGreen.black(" BEST MATCH "));
+            // Best value = lowest total cost
+            const allCosts = allProducts.map((x) => x.priceInCents + (x.freeShipping ? 0 : (x.shippingPriceInCents ?? 0)));
+            if (totalCost === Math.min(...allCosts) && i !== 0) badges.push(chalk.bgYellow.black(" BEST VALUE "));
+
+            // ── Compact mode ──
+            if (opts.compact) {
+              const priceStr = formatPrice(totalCost, p.currency);
+              const store = p.vendor;
+              const delivery = p.shippingDays != null ? `Arrives ${estimatedArrival(p.shippingDays)}` : "";
+              console.log(
+                `  ${chalk.dim(`[${num}]`)} ${chalk.cyan(p.name.length > 60 ? p.name.slice(0, 57) + "..." : p.name)}  ` +
+                `${chalk.bold.white(priceStr)}  ${chalk.dim(store)}${delivery ? "  " + chalk.dim(delivery) : ""}` +
+                (badges.length ? "  " + badges.join(" ") : "")
+              );
+              continue;
+            }
+
+            // ── Normal / Detailed mode ──
+            // Number + Title + badges
+            console.log(`  ${chalk.dim(`[${num}]`)} ${chalk.bold.cyan(p.name)}${badges.length ? "  " + badges.join(" ") : ""}`);
+
+            // Price line
+            let priceLine = `      ${chalk.bold.white(formatPrice(itemPrice, p.currency))}`;
+            if (p.freeShipping) {
+              priceLine += chalk.green("  Free Shipping");
+            } else if (p.shippingPriceInCents != null && (p.shippingPriceInCents ?? 0) > 0) {
+              priceLine += chalk.dim(` + ${formatPrice(shippingPrice, p.currency)} shipping`);
+              priceLine += chalk.bold(` = ${formatPrice(totalCost, p.currency)}`);
+            }
+            // Delivery date
+            if (p.shippingDays != null) {
+              priceLine += chalk.blue(`  Arrives ${estimatedArrival(p.shippingDays)}`);
+            }
+            console.log(priceLine);
+
+            // Store & ratings
+            const meta: string[] = [];
+            const storeBadge = p.storeVerified ? chalk.green(" ✓") : "";
+            const storeScore = p.storeRating != null ? ` ${scoreOutOf10(p.storeRating)}/10` : "";
+            meta.push(`${p.vendor}${storeBadge}${chalk.dim(storeScore)}`);
+            if (p.brand) meta.push(p.brand);
+            if (p.rating && p.rating > 0) {
+              meta.push(chalk.yellow(`${scoreOutOf10(p.rating)}/10`) + (p.reviewCount ? chalk.dim(` (${p.reviewCount})`) : ""));
+            }
+            if (p.isExtended) meta.push(chalk.magenta("via extended search"));
+            console.log(`      ${chalk.dim(meta.join(" · "))}`);
+
+            // Detailed mode: extra info
+            if (opts.detailed) {
+              if (p.category) console.log(`      ${chalk.dim(`Category: ${p.category}`)}`);
+              if (p.variant || p.variantLabel) console.log(`      ${chalk.dim(`Variant: ${p.variant || p.variantLabel}`)}`);
+              if (p.description) {
+                console.log(`      ${chalk.dim(p.description.length > 200 ? p.description.slice(0, 200) + "..." : p.description)}`);
+              }
+            } else {
+              // Normal mode: short description
+              if (p.description) {
+                console.log(`      ${chalk.dim(p.description.length > 80 ? p.description.slice(0, 80) + "..." : p.description)}`);
+              }
+            }
+            console.log();
+          }
         }
 
         const totalPages = Math.ceil(result.total / result.pageSize);
         if (totalPages > 1) {
           console.log(chalk.dim(`  Page ${result.page} of ${totalPages}. Use --page to navigate.\n`));
-        }
-
-        // ── Extended search results ───────────────────────────────────
-        if (extended && extended.products && extended.products.length > 0) {
-          if (result.products.length > 0) {
-            console.log(chalk.bold.magenta(`\n── Extended Search Results (${extended.total} from ${extended.storesResponded} store(s)) ──\n`));
-          }
-
-          for (const ep of extended.products) {
-            const itemPrice = ep.priceInCents;
-            const shippingPrice = ep.freeShipping ? 0 : (ep.shippingPriceInCents ?? 0);
-            const totalPrice = itemPrice + shippingPrice;
-
-            // Title
-            console.log(`  ${chalk.bold.cyan(ep.name)}`);
-
-            // Price line: price + shipping = total
-            let priceLine = `    ${chalk.bold.white(formatPrice(itemPrice, ep.currency))}`;
-            if (ep.freeShipping) {
-              priceLine += chalk.green("  Free Shipping");
-            } else if (ep.shippingPriceInCents != null && ep.shippingPriceInCents > 0) {
-              priceLine += chalk.dim(` + ${formatPrice(shippingPrice, ep.currency)} shipping`);
-              priceLine += chalk.bold(` = ${formatPrice(totalPrice, ep.currency)}`);
-            }
-            if (ep.shippingDays != null) priceLine += chalk.dim(` (${deliveryLabel(ep.shippingDays)})`);
-            console.log(priceLine);
-
-            // Store & meta
-            const meta: string[] = [];
-            if (ep.storeName) meta.push(ep.storeName);
-            if (ep.brand) meta.push(ep.brand);
-            if (ep.variant || ep.variantLabel) meta.push(ep.variant || ep.variantLabel);
-            console.log(`    ${chalk.dim(meta.join(" · "))}`);
-
-            // Description (short)
-            if (ep.description) {
-              console.log(`    ${chalk.dim(ep.description.length > 100 ? ep.description.slice(0, 100) + "..." : ep.description)}`);
-            }
-            console.log();
-          }
         }
 
         // Show advertise tip on the last page of results
