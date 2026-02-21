@@ -581,6 +581,8 @@ export function registerSearchCommands(program: Command): void {
             }
             if (p.isExtended) meta.push(chalk.magenta("via extended search"));
             console.log(`      ${chalk.dim(meta.join(" · "))}`);
+            // Product ID
+            if (p.id) console.log(`      ${chalk.dim(`ID: ${p.id}`)}`);;
 
             // Detailed mode: extra info
             if (opts.detailed) {
