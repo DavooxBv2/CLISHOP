@@ -120,7 +120,8 @@ export function registerSearchCommands(program: Command): void {
 
     // Extended search
     .option("-e, --extended-search", "Enable extended search: query darkstores when no local results found")
-    .option("--extended-timeout <seconds>", "Extended search timeout in seconds (default: 20, max: 60)", parseInt)
+    .option("--no-extended-search", "Disable automatic extended search when no local results found")
+    .option("--extended-timeout <seconds>", "Extended search timeout in seconds (default: 30, max: 60)", parseInt)
 
     // Output
     .option("--json", "Output raw JSON")
@@ -172,91 +173,109 @@ export function registerSearchCommands(program: Command): void {
           spinner.text = `Searching for "${query}"...`;
         }
 
-        // Extended search: clamp timeout to 5-60s
-        const extendedSearch = opts.extendedSearch || false;
+        // Extended search: clamp timeout to 5-60s, default 30s
+        // Extended search is enabled by default (auto-triggers when no results found)
+        // User can force it with -e, or disable it with --no-extended-search
+        const forceExtended = opts.extendedSearch === true;
+        const disableExtended = opts.extendedSearch === false;
         const extendedTimeout = opts.extendedTimeout
           ? Math.min(60, Math.max(5, opts.extendedTimeout))
-          : 20;
+          : 30;
 
-        // Extended search requires a delivery location so vendor stores know
-        // which Amazon marketplaces / regions to search
-        if (extendedSearch && !shipToCountry && !shipToCity && !shipToPostalCode) {
-          spinner.stop();
-          console.log(
-            chalk.yellow("\n⚠  Extended search requires a delivery location.\n") +
-            chalk.white("  Vendor stores (like Amazon) need to know where to deliver so they\n") +
-            chalk.white("  can search the right marketplaces for you.\n\n") +
-            chalk.dim("  Add a location with one of these options:\n") +
-            chalk.cyan("    --country <code>     ") + chalk.dim("ISO country code (e.g. US, BE, DE, FR)\n") +
-            chalk.cyan("    --postal-code <code> ") + chalk.dim("ZIP/postal code\n") +
-            chalk.cyan("    --ship-to <label>    ") + chalk.dim("Saved address label (from: clishop address list)\n\n") +
-            chalk.dim("  Examples:\n") +
-            chalk.cyan(`    clishop search "${query}" -e --country US\n`) +
-            chalk.cyan(`    clishop search "${query}" -e --country BE --postal-code 1000\n`) +
-            chalk.cyan(`    clishop search "${query}" -e --ship-to home\n`)
-          );
-          return;
+        // Build common search params (reused for both regular & extended calls)
+        const searchParams: Record<string, any> = {
+          q: query,
+          // Product match
+          category: opts.category,
+          brand: opts.brand,
+          model: opts.model,
+          sku: opts.sku,
+          gtin: opts.gtin,
+          variant: opts.variant,
+          // Cost
+          minPrice: opts.minPrice,
+          maxPrice: opts.maxPrice,
+          maxShipping: opts.maxShipping,
+          maxTotal: opts.maxTotal,
+          freeShipping: opts.freeShipping || undefined,
+          // Delivery location
+          shipTo: opts.shipTo || undefined,
+          country: shipToCountry,
+          city: shipToCity,
+          postalCode: shipToPostalCode,
+          region: shipToRegion,
+          lat: shipToLat,
+          lng: shipToLng,
+          maxDeliveryDays: maxDeliveryDays,
+          // Availability
+          inStock: opts.inStock || undefined,
+          excludeBackorder: opts.excludeBackorder || undefined,
+          minQty: opts.minQty,
+          // Returns
+          freeReturns: opts.freeReturns || undefined,
+          minReturnDays: opts.minReturnWindowDays,
+          // Trust
+          store: opts.store,
+          vendor: opts.vendor,
+          trustedOnly: opts.trustedOnly || undefined,
+          minStoreRating: opts.minStoreRating,
+          checkoutMode: opts.checkoutMode,
+          // Rating / sorting / pagination
+          minRating: opts.minRating,
+          sort: opts.sort,
+          order: opts.order,
+          page: opts.page,
+          pageSize: opts.perPage,
+        };
+
+        // If user forced extended search (-e), include it in the first call
+        if (forceExtended) {
+          searchParams.extendedSearch = true;
+          searchParams.extendedTimeout = extendedTimeout;
         }
 
-        // If extended search is enabled, increase the HTTP timeout to match
-        const httpTimeout = extendedSearch ? (extendedTimeout + 5) * 1000 : 15000;
+        const httpTimeout = forceExtended ? (extendedTimeout + 5) * 1000 : 15000;
 
-        if (extendedSearch) {
+        if (forceExtended) {
           const locationParts = [shipToCountry, shipToCity, shipToPostalCode].filter(Boolean);
           const locationLabel = locationParts.length > 0 ? locationParts.join(", ") : "global";
           spinner.text = `Searching for "${query}" (extended search: ${extendedTimeout}s timeout, deliver to: ${locationLabel})...`;
         }
 
-        const res = await api.get("/products/search", {
-          params: {
-            q: query,
-            // Product match
-            category: opts.category,
-            brand: opts.brand,
-            model: opts.model,
-            sku: opts.sku,
-            gtin: opts.gtin,
-            variant: opts.variant,
-            // Cost
-            minPrice: opts.minPrice,
-            maxPrice: opts.maxPrice,
-            maxShipping: opts.maxShipping,
-            maxTotal: opts.maxTotal,
-            freeShipping: opts.freeShipping || undefined,
-            // Delivery location
-            shipTo: opts.shipTo || undefined,
-            country: shipToCountry,
-            city: shipToCity,
-            postalCode: shipToPostalCode,
-            region: shipToRegion,
-            lat: shipToLat,
-            lng: shipToLng,
-            maxDeliveryDays: maxDeliveryDays,
-            // Availability
-            inStock: opts.inStock || undefined,
-            excludeBackorder: opts.excludeBackorder || undefined,
-            minQty: opts.minQty,
-            // Returns
-            freeReturns: opts.freeReturns || undefined,
-            minReturnDays: opts.minReturnWindowDays,
-            // Trust
-            store: opts.store,
-            vendor: opts.vendor,
-            trustedOnly: opts.trustedOnly || undefined,
-            minStoreRating: opts.minStoreRating,
-            checkoutMode: opts.checkoutMode,
-            // Rating / sorting / pagination
-            minRating: opts.minRating,
-            sort: opts.sort,
-            order: opts.order,
-            page: opts.page,
-            pageSize: opts.perPage,
-            // Extended search
-            extendedSearch: extendedSearch || undefined,
-            extendedTimeout: extendedSearch ? extendedTimeout : undefined,
-          },
+        let res = await api.get("/products/search", {
+          params: searchParams,
           timeout: httpTimeout,
         });
+
+        // ── Auto-trigger extended search when no results found ──
+        // If the regular search found nothing and extended search wasn't disabled,
+        // automatically run the extended search to query all registered stores.
+        const regularResult: SearchResult = res.data;
+        const regularExtended = (res.data as any).extended;
+
+        if (
+          regularResult.products.length === 0 &&
+          (!regularExtended || regularExtended.total === 0) &&
+          !forceExtended &&
+          !disableExtended
+        ) {
+          spinner.text = `No local results for "${query}". Starting extended search across all stores (${extendedTimeout}s timeout)...`;
+
+          try {
+            res = await api.get("/products/search", {
+              params: {
+                ...searchParams,
+                extendedSearch: true,
+                extendedTimeout,
+              },
+              timeout: (extendedTimeout + 5) * 1000,
+            });
+          } catch (extErr) {
+            // If extended search fails (e.g. timeout), continue with empty results
+            spinner.warn(`Extended search failed — showing regular results only.`);
+          }
+        }
+
         spinner.stop();
 
         const result: SearchResult = res.data;
@@ -269,31 +288,34 @@ export function registerSearchCommands(program: Command): void {
         // Check for extended search results
         const extended = (res.data as any).extended;
         const suggestAdvertise = (res.data as any).suggestAdvertise;
+        const didExtendedSearch = forceExtended || (res.data as any).extended != null;
 
         if (result.products.length === 0 && (!extended || extended.total === 0)) {
-          console.log(chalk.yellow(`\nNo results found for "${query}".`));
+          if (didExtendedSearch) {
+            console.log(chalk.yellow(`\nNo results found for "${query}" (searched local catalog + all vendor stores).`));
+          } else {
+            console.log(chalk.yellow(`\nNo results found for "${query}".`));
+          }
 
-          if (!extendedSearch) {
+          if (!didExtendedSearch && disableExtended) {
             console.log(
               chalk.dim("\n  🔍 Tip: ") +
-              chalk.white("Try extended search to query vendor stores in real-time:") +
+              chalk.white("Extended search was disabled. Enable it to query vendor stores in real-time:") +
               chalk.dim(`\n         Run: `) +
               chalk.cyan(`clishop search "${query}" --extended-search`) +
               chalk.dim("\n")
             );
           }
 
-          if (suggestAdvertise || !extendedSearch) {
-            console.log(
-              chalk.dim("  💡 Tip: ") +
-              chalk.white("Can't find what you need? Advertise your request and let vendors come to you!") +
-              chalk.dim(`\n         Run: `) +
-              chalk.cyan(`clishop advertise create`) +
-              chalk.dim(` or `) +
-              chalk.cyan(`clishop advertise quick "${query}"`) +
-              chalk.dim("\n")
-            );
-          }
+          console.log(
+            chalk.dim("  💡 Tip: ") +
+            chalk.white("Can't find what you need? Advertise your request and let vendors come to you!") +
+            chalk.dim(`\n         Run: `) +
+            chalk.cyan(`clishop advertise create`) +
+            chalk.dim(` or `) +
+            chalk.cyan(`clishop advertise quick "${query}"`) +
+            chalk.dim("\n")
+          );
           return;
         }
 
@@ -408,11 +430,11 @@ export function registerSearchCommands(program: Command): void {
         // Show advertise tip on the last page of results
         const showAdvertiseTip = result.page >= totalPages || suggestAdvertise;
         if (showAdvertiseTip) {
-          // If no extended search was used, suggest it
-          if (!extendedSearch && result.products.length > 0) {
+          // If no extended search was used and it was explicitly disabled, suggest it
+          if (!didExtendedSearch && disableExtended && result.products.length > 0) {
             console.log(
               chalk.dim("  🔍 Tip: ") +
-              chalk.white("Want more results? Try extended search:") +
+              chalk.white("Want more results? Extended search was disabled. Enable it:") +
               chalk.dim(`\n         Run: `) +
               chalk.cyan(`clishop search "${query}" --extended-search`) +
               chalk.dim("\n")
