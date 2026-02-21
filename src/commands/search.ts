@@ -355,52 +355,39 @@ export function registerSearchCommands(program: Command): void {
         }
 
         for (const p of result.products) {
-          const stock = p.inStock
-            ? chalk.green("In Stock")
-            : p.backorder
-              ? chalk.yellow("Backorder")
-              : chalk.red("Out of Stock");
-          const price = chalk.bold.white(formatPrice(p.priceInCents, p.currency));
-          const stars = chalk.yellow(renderStars(p.rating));
-
-          // Shipping info
-          const shippingInfo = p.freeShipping
-            ? chalk.green("Free Shipping")
-            : p.shippingPriceInCents != null
-              ? chalk.dim(`+${formatPrice(p.shippingPriceInCents, p.currency)} shipping`)
-              : "";
-          const deliveryInfo = p.shippingDays != null
-            ? chalk.dim(`(${deliveryLabel(p.shippingDays)})`)
-            : "";
-
-          // Store trust badge
+          const itemPrice = p.priceInCents;
+          const shippingPrice = p.freeShipping ? 0 : (p.shippingPriceInCents ?? 0);
+          const totalPrice = itemPrice + shippingPrice;
+          const stars = p.rating > 0 ? chalk.yellow(renderStars(p.rating)) + chalk.dim(` (${p.reviewCount})`) : "";
           const storeBadge = p.storeVerified ? chalk.green(" ✓") : "";
+          const storeRating = p.storeRating != null ? chalk.dim(` ${(p.storeRating * 2).toFixed(1)}/10`) : "";
 
-          console.log(`  ${chalk.bold.cyan(p.name)} ${chalk.dim(`(${p.id})`)}`);
-          console.log(
-            `    ${price}  ${stock}  ${stars} ${chalk.dim(`(${p.reviewCount} reviews)`)}` +
-            (shippingInfo ? `  ${shippingInfo}` : "") +
-            (deliveryInfo ? ` ${deliveryInfo}` : "")
-          );
+          // Title
+          console.log(`  ${chalk.bold.cyan(p.name)}`);
 
+          // Price line: price + shipping = total
+          let priceLine = `    ${chalk.bold.white(formatPrice(itemPrice, p.currency))}`;
+          if (p.freeShipping) {
+            priceLine += chalk.green("  Free Shipping");
+          } else if (p.shippingPriceInCents != null && p.shippingPriceInCents > 0) {
+            priceLine += chalk.dim(` + ${formatPrice(shippingPrice, p.currency)} shipping`);
+            priceLine += chalk.bold(` = ${formatPrice(totalPrice, p.currency)}`);
+          }
+          if (p.shippingDays != null) priceLine += chalk.dim(` (${deliveryLabel(p.shippingDays)})`);
+          console.log(priceLine);
+
+          // Store & rating
           const meta: string[] = [];
-          if (p.category) meta.push(p.category);
+          meta.push(`${p.vendor}${storeBadge}${storeRating}`);
           if (p.brand) meta.push(p.brand);
-          if (p.variant) meta.push(p.variant);
-          meta.push(`by ${p.vendor}${storeBadge}`);
+          if (p.category) meta.push(p.category);
+          if (stars) meta.push(stars);
           console.log(`    ${chalk.dim(meta.join(" · "))}`);
 
-          // Returns info
-          const returnInfo: string[] = [];
-          if (p.freeReturns) returnInfo.push("Free Returns");
-          if (p.returnWindowDays) returnInfo.push(`${p.returnWindowDays}d return window`);
-          if (p.checkoutMode === "handoff") returnInfo.push("Handoff checkout");
-
-          if (returnInfo.length) {
-            console.log(`    ${chalk.dim(returnInfo.join(" · "))}`);
+          // Description (short)
+          if (p.description) {
+            console.log(`    ${chalk.dim(p.description.length > 100 ? p.description.slice(0, 100) + "..." : p.description)}`);
           }
-
-          console.log(`    ${p.description.length > 120 ? p.description.slice(0, 120) + "..." : p.description}`);
           console.log();
         }
 
@@ -416,36 +403,34 @@ export function registerSearchCommands(program: Command): void {
           }
 
           for (const ep of extended.products) {
-            const stock = ep.inStock
-              ? chalk.green("In Stock")
-              : chalk.red("Out of Stock");
-            const price = chalk.bold.white(formatPrice(ep.priceInCents, ep.currency));
+            const itemPrice = ep.priceInCents;
+            const shippingPrice = ep.freeShipping ? 0 : (ep.shippingPriceInCents ?? 0);
+            const totalPrice = itemPrice + shippingPrice;
 
-            const shippingInfo = ep.freeShipping
-              ? chalk.green("Free Shipping")
-              : ep.shippingPriceInCents != null
-                ? chalk.dim(`+${formatPrice(ep.shippingPriceInCents, ep.currency)} shipping`)
-                : "";
-            const deliveryInfo = ep.shippingDays != null
-              ? chalk.dim(`(${deliveryLabel(ep.shippingDays)})`)
-              : "";
+            // Title
+            console.log(`  ${chalk.bold.cyan(ep.name)}`);
 
-            console.log(`  ${chalk.bold.cyan(ep.name)} ${chalk.dim(`(${ep.externalProductId})`)}`);
-            console.log(
-              `    ${price}  ${stock}` +
-              (shippingInfo ? `  ${shippingInfo}` : "") +
-              (deliveryInfo ? ` ${deliveryInfo}` : "")
-            );
+            // Price line: price + shipping = total
+            let priceLine = `    ${chalk.bold.white(formatPrice(itemPrice, ep.currency))}`;
+            if (ep.freeShipping) {
+              priceLine += chalk.green("  Free Shipping");
+            } else if (ep.shippingPriceInCents != null && ep.shippingPriceInCents > 0) {
+              priceLine += chalk.dim(` + ${formatPrice(shippingPrice, ep.currency)} shipping`);
+              priceLine += chalk.bold(` = ${formatPrice(totalPrice, ep.currency)}`);
+            }
+            if (ep.shippingDays != null) priceLine += chalk.dim(` (${deliveryLabel(ep.shippingDays)})`);
+            console.log(priceLine);
 
+            // Store & meta
             const meta: string[] = [];
+            if (ep.storeName) meta.push(ep.storeName);
             if (ep.brand) meta.push(ep.brand);
             if (ep.variant || ep.variantLabel) meta.push(ep.variant || ep.variantLabel);
-            if (ep.storeName) meta.push(`by ${ep.storeName}`);
-            meta.push(chalk.magenta("extended"));
             console.log(`    ${chalk.dim(meta.join(" · "))}`);
 
+            // Description (short)
             if (ep.description) {
-              console.log(`    ${ep.description.length > 120 ? ep.description.slice(0, 120) + "..." : ep.description}`);
+              console.log(`    ${chalk.dim(ep.description.length > 100 ? ep.description.slice(0, 100) + "..." : ep.description)}`);
             }
             console.log();
           }
