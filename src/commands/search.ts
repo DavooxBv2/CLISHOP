@@ -117,7 +117,7 @@ export function registerSearchCommands(program: Command): void {
     .option("-s, --sort <field>", "Sort by: price, rating, relevance, newest, delivery", "relevance")
     .option("--order <dir>", "Sort order: asc, desc", "desc")
     .option("-p, --page <page>", "Page number", parseInt, 1)
-    .option("-n, --per-page <count>", "Results per page", parseInt, 20)
+    .option("-n, --per-page <count>", "Results per page", parseInt, 10)
 
     // Extended search
     .option("-e, --extended-search", "Enable extended search: query darkstores when no local results found")
