@@ -2,6 +2,7 @@ import { Command } from "commander";
 import chalk from "chalk";
 import ora from "ora";
 import { getApiClient, handleApiError } from "../api.js";
+import { getActiveAgent } from "../config.js";
 
 export interface Product {
   id: string;
@@ -171,6 +172,29 @@ export function registerSearchCommands(program: Command): void {
             // Address lookup failed — continue without it
           }
           spinner.text = `Searching for "${query}"...`;
+        }
+
+        // Auto-resolve default address when no location flags are set
+        // Uses the active agent's default address so searches target the right region
+        if (!shipToCountry && !shipToCity && !shipToPostalCode && !opts.shipTo) {
+          const agent = getActiveAgent();
+          if (agent.defaultAddressId) {
+            try {
+              spinner.text = `Resolving default address...`;
+              const addrRes = await api.get("/addresses");
+              const addresses = addrRes.data.addresses || [];
+              const defaultAddr = addresses.find((a: any) => a.id === agent.defaultAddressId);
+              if (defaultAddr) {
+                shipToCountry = defaultAddr.country;
+                shipToCity = defaultAddr.city;
+                shipToPostalCode = defaultAddr.postalCode;
+                shipToRegion = defaultAddr.region || undefined;
+                spinner.text = `Searching for "${query}" (delivering to: ${[shipToCity, shipToCountry].filter(Boolean).join(", ")})...`;
+              }
+            } catch {
+              // Default address lookup failed — continue without it
+            }
+          }
         }
 
         // Extended search: clamp timeout to 5-60s, default 30s
