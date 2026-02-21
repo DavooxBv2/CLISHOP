@@ -572,7 +572,7 @@ export function registerSearchCommands(program: Command): void {
             const meta: string[] = [];
             const storeBadge = p.storeVerified ? chalk.green(" ✓") : "";
             const storeScore = p.storeRating != null
-              ? chalk.dim(` ${scoreOutOf10(p.storeRating)}/10`)
+              ? chalk.dim(` ${p.storeRating.toFixed(1)}/10`)
               : chalk.dim(" (no store rating)");
             meta.push(`${p.vendor}${storeBadge}${storeScore}`);
             if (p.brand) meta.push(p.brand);
