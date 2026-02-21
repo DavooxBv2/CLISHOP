@@ -50,6 +50,42 @@ function formatPrice(cents: number, currency: string): string {
   }).format(cents / 100);
 }
 
+// ── Currency conversion ──────────────────────────────────────────────
+// Uses the free open.er-api.com (no key needed, updates daily)
+
+let rateCache: { base: string; rates: Record<string, number>; fetchedAt: number } | null = null;
+
+async function fetchRates(baseCurrency: string): Promise<Record<string, number>> {
+  // Cache for 1 hour
+  if (rateCache && rateCache.base === baseCurrency && Date.now() - rateCache.fetchedAt < 3600000) {
+    return rateCache.rates;
+  }
+  try {
+    const res = await fetch(`https://open.er-api.com/v6/latest/${baseCurrency}`);
+    const data = await res.json() as { rates?: Record<string, number> };
+    if (data.rates) {
+      rateCache = { base: baseCurrency, rates: data.rates, fetchedAt: Date.now() };
+      return data.rates;
+    }
+  } catch {
+    // Silently fail — conversion is optional
+  }
+  return {};
+}
+
+function convertPrice(cents: number, fromCurrency: string, toCurrency: string, rates: Record<string, number>): number | null {
+  if (fromCurrency === toCurrency) return null; // same currency, no conversion needed
+  const rate = rates[toCurrency];
+  if (!rate) return null;
+  return Math.round(cents * rate);
+}
+
+function formatConverted(cents: number, fromCurrency: string, toCurrency: string, rates: Record<string, number>): string {
+  const converted = convertPrice(cents, fromCurrency, toCurrency, rates);
+  if (converted == null) return "";
+  return chalk.dim(` (~${formatPrice(converted, toCurrency)})`);
+}
+
 function renderStars(rating: number): string {
   const full = Math.floor(rating);
   const half = rating - full >= 0.5 ? 1 : 0;
@@ -363,6 +399,27 @@ export function registerSearchCommands(program: Command): void {
           return;
         }
 
+        // ── Fetch exchange rates for currency conversion ──────────
+        // Determine user's preferred currency from their country
+        const COUNTRY_CURRENCY: Record<string, string> = {
+          US: "USD", CA: "CAD", GB: "GBP", AU: "AUD", NZ: "NZD",
+          EU: "EUR", DE: "EUR", FR: "EUR", IT: "EUR", ES: "EUR", NL: "EUR",
+          BE: "EUR", AT: "EUR", IE: "EUR", PT: "EUR", FI: "EUR", GR: "EUR",
+          LU: "EUR", SK: "EUR", SI: "EUR", EE: "EUR", LV: "EUR", LT: "EUR",
+          SE: "SEK", NO: "NOK", DK: "DKK", PL: "PLN", CZ: "CZK",
+          CH: "CHF", HU: "HUF", RO: "RON", BG: "BGN", HR: "EUR",
+          JP: "JPY", CN: "CNY", KR: "KRW", IN: "INR", SG: "SGD",
+          TH: "THB", AE: "AED", IL: "ILS", TR: "TRY", ZA: "ZAR",
+          BR: "BRL", MX: "MXN", AR: "ARS", CO: "COP", CL: "CLP",
+        };
+        const userCurrency = shipToCountry ? (COUNTRY_CURRENCY[shipToCountry.toUpperCase()] || "EUR") : "EUR";
+        let exchangeRates: Record<string, number> = {};
+        try {
+          exchangeRates = await fetchRates(userCurrency);
+        } catch {
+          // Non-critical — conversion just won't show
+        }
+
         // ── Merge all products for display ──────────────────────────
         // Combine local + extended into a unified list for rendering
         type DisplayProduct = {
@@ -473,9 +530,12 @@ export function registerSearchCommands(program: Command): void {
             const allCosts = allProducts.map((x) => x.priceInCents + (x.freeShipping ? 0 : (x.shippingPriceInCents ?? 0)));
             if (totalCost === Math.min(...allCosts) && i !== 0) badges.push(chalk.bgYellow.black(" BEST VALUE "));
 
+            // Currency conversion hint (only when product currency differs from user's)
+            const converted = formatConverted(totalCost, p.currency, userCurrency, exchangeRates);
+
             // ── Compact mode ──
             if (opts.compact) {
-              const priceStr = formatPrice(totalCost, p.currency);
+              const priceStr = formatPrice(totalCost, p.currency) + converted;
               const store = p.vendor;
               const delivery = p.shippingDays != null ? `Arrives ${estimatedArrival(p.shippingDays)}` : "";
               console.log(
@@ -490,7 +550,7 @@ export function registerSearchCommands(program: Command): void {
             // Number + Title + badges
             console.log(`  ${chalk.dim(`[${num}]`)} ${chalk.bold.cyan(p.name)}${badges.length ? "  " + badges.join(" ") : ""}`);
 
-            // Price line
+            // Price line with currency conversion
             let priceLine = `      ${chalk.bold.white(formatPrice(itemPrice, p.currency))}`;
             if (p.freeShipping) {
               priceLine += chalk.green("  Free Shipping");
@@ -498,6 +558,8 @@ export function registerSearchCommands(program: Command): void {
               priceLine += chalk.dim(` + ${formatPrice(shippingPrice, p.currency)} shipping`);
               priceLine += chalk.bold(` = ${formatPrice(totalCost, p.currency)}`);
             }
+            // Currency conversion
+            priceLine += converted;
             // Delivery date
             if (p.shippingDays != null) {
               priceLine += chalk.blue(`  Arrives ${estimatedArrival(p.shippingDays)}`);
