@@ -178,11 +178,33 @@ export function registerSearchCommands(program: Command): void {
           ? Math.min(60, Math.max(5, opts.extendedTimeout))
           : 20;
 
+        // Extended search requires a delivery location so vendor stores know
+        // which Amazon marketplaces / regions to search
+        if (extendedSearch && !shipToCountry && !shipToCity && !shipToPostalCode) {
+          spinner.stop();
+          console.log(
+            chalk.yellow("\n⚠  Extended search requires a delivery location.\n") +
+            chalk.white("  Vendor stores (like Amazon) need to know where to deliver so they\n") +
+            chalk.white("  can search the right marketplaces for you.\n\n") +
+            chalk.dim("  Add a location with one of these options:\n") +
+            chalk.cyan("    --country <code>     ") + chalk.dim("ISO country code (e.g. US, BE, DE, FR)\n") +
+            chalk.cyan("    --postal-code <code> ") + chalk.dim("ZIP/postal code\n") +
+            chalk.cyan("    --ship-to <label>    ") + chalk.dim("Saved address label (from: clishop address list)\n\n") +
+            chalk.dim("  Examples:\n") +
+            chalk.cyan(`    clishop search "${query}" -e --country US\n`) +
+            chalk.cyan(`    clishop search "${query}" -e --country BE --postal-code 1000\n`) +
+            chalk.cyan(`    clishop search "${query}" -e --ship-to home\n`)
+          );
+          return;
+        }
+
         // If extended search is enabled, increase the HTTP timeout to match
         const httpTimeout = extendedSearch ? (extendedTimeout + 5) * 1000 : 15000;
 
         if (extendedSearch) {
-          spinner.text = `Searching for "${query}" (extended search: ${extendedTimeout}s timeout)...`;
+          const locationParts = [shipToCountry, shipToCity, shipToPostalCode].filter(Boolean);
+          const locationLabel = locationParts.length > 0 ? locationParts.join(", ") : "global";
+          spinner.text = `Searching for "${query}" (extended search: ${extendedTimeout}s timeout, deliver to: ${locationLabel})...`;
         }
 
         const res = await api.get("/products/search", {
