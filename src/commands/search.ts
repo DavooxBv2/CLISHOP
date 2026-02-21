@@ -453,6 +453,8 @@ export function registerSearchCommands(program: Command): void {
               shippingPriceInCents: ep.shippingPriceInCents,
               shippingDays: ep.shippingDays,
               vendor: ep.storeName || "Unknown",
+              storeRating: ep.storeRating ?? null,
+              storeVerified: ep.storeVerified ?? false,
               brand: ep.brand,
               variant: ep.variant,
               variantLabel: ep.variantLabel,
@@ -569,8 +571,10 @@ export function registerSearchCommands(program: Command): void {
             // Store & ratings
             const meta: string[] = [];
             const storeBadge = p.storeVerified ? chalk.green(" ✓") : "";
-            const storeScore = p.storeRating != null ? ` ${scoreOutOf10(p.storeRating)}/10` : "";
-            meta.push(`${p.vendor}${storeBadge}${chalk.dim(storeScore)}`);
+            const storeScore = p.storeRating != null
+              ? chalk.dim(` ${scoreOutOf10(p.storeRating)}/10`)
+              : chalk.dim(" (no store rating)");
+            meta.push(`${p.vendor}${storeBadge}${storeScore}`);
             if (p.brand) meta.push(p.brand);
             if (p.rating && p.rating > 0) {
               meta.push(chalk.yellow(`${scoreOutOf10(p.rating)}/10`) + (p.reviewCount ? chalk.dim(` (${p.reviewCount})`) : ""));
