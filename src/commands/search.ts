@@ -2,76 +2,8 @@ import { Command } from "commander";
 import chalk from "chalk";
 import ora from "ora";
 import inquirer from "inquirer";
-import sharp from "sharp";
 import { getApiClient, handleApiError } from "../api.js";
 import { getActiveAgent } from "../config.js";
-
-// ── Helper: render an image in the terminal using ANSI truecolor ────────
-// Uses sharp to decode/resize, then renders with half-block characters (▄)
-// and explicit 24-bit ANSI color codes. Works cross-platform on any
-// terminal that supports truecolor (Windows Terminal, iTerm2, most Linux terms).
-const UPPER_HALF = "\u2580"; // ▀
-const RESET = "\x1b[0m";
-
-function ansiTruecolorFg(r: number, g: number, b: number): string {
-  return `\x1b[38;2;${r};${g};${b}m`;
-}
-function ansiTruecolorBg(r: number, g: number, b: number): string {
-  return `\x1b[48;2;${r};${g};${b}m`;
-}
-
-async function renderImageInline(imageUrl: string, widthCols = 40): Promise<void> {
-  try {
-    const axios = (await import("axios")).default;
-    const response = await axios.get(imageUrl, {
-      responseType: "arraybuffer",
-      timeout: 8000,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; CLIShop/1.0)",
-      },
-    });
-
-    // Decode + resize image to fit terminal width
-    const resized = sharp(Buffer.from(response.data))
-      .resize(widthCols, undefined, { fit: "inside" })
-      .removeAlpha()
-      .raw();
-
-    const { data, info } = await resized.toBuffer({ resolveWithObject: true });
-    const { width, height } = info;
-    const pixels = new Uint8Array(data);
-
-    // Get pixel (r,g,b) at position
-    const px = (x: number, y: number): [number, number, number] => {
-      const i = (y * width + x) * 3;
-      return [pixels[i], pixels[i + 1], pixels[i + 2]];
-    };
-
-    // Render two rows per terminal line using the half-block trick:
-    // foreground = top pixel, background = bottom pixel, char = ▀
-    const lines: string[] = [];
-    for (let y = 0; y < height; y += 2) {
-      let line = "      "; // indent
-      for (let x = 0; x < width; x++) {
-        const [tr, tg, tb] = px(x, y); // top pixel
-        if (y + 1 < height) {
-          const [br, bg, bb] = px(x, y + 1); // bottom pixel
-          line += `${ansiTruecolorFg(tr, tg, tb)}${ansiTruecolorBg(br, bg, bb)}${UPPER_HALF}`;
-        } else {
-          // Odd height — last row has no bottom pixel
-          line += `${ansiTruecolorFg(tr, tg, tb)}${UPPER_HALF}`;
-        }
-      }
-      line += RESET;
-      lines.push(line);
-    }
-
-    console.log(lines.join("\n"));
-  } catch {
-    // Silently skip — image rendering is best-effort
-    console.log(chalk.dim(`      (Could not render image preview)`));
-  }
-}
 
 export interface Product {
   id: string;
@@ -262,12 +194,12 @@ function renderFreeFormInfo(data: any, indent: number = 0): void {
 
 // ── Render a single product info result (reusable by both `info` command and interactive mode) ──
 
-async function renderProductInfo(
+function renderProductInfo(
   result: any,
   index: number,
   totalResults: number,
   formatPriceFn: (cents: number, currency: string) => string,
-): Promise<void> {
+): void {
   const num = index + 1;
 
   // Header
@@ -493,10 +425,6 @@ async function renderProductInfo(
   // Images
   if (info.images && Array.isArray(info.images) && info.images.length > 0) {
     console.log(`      ${chalk.bold("Images:")} ${chalk.dim(`${info.images.length} available`)}`);
-
-    // Render the first image inline in the terminal
-    await renderImageInline(info.images[0]);
-
     for (let j = 0; j < Math.min(3, info.images.length); j++) {
       console.log(`        ${chalk.dim(`[${j + 1}]`)} ${chalk.blue.underline(info.images[j])}`);
     }
@@ -1147,7 +1075,7 @@ export function registerSearchCommands(program: Command): void {
 
                     for (let i = 0; i < infoResults.length; i++) {
                       const infoResult = infoResults[i];
-                      await renderProductInfo(infoResult, i, infoResults.length, formatPrice);
+                      renderProductInfo(infoResult, i, infoResults.length, formatPrice);
                     }
                   } else {
                     console.log(chalk.yellow("\n  No additional information returned from the stores."));
@@ -1382,7 +1310,7 @@ export function registerSearchCommands(program: Command): void {
         console.log(chalk.bold(`\nProduct Information — ${total} result(s)\n`));
 
         for (let i = 0; i < results.length; i++) {
-          await renderProductInfo(results[i], i, results.length, formatPrice);
+          renderProductInfo(results[i], i, results.length, formatPrice);
         }
       } catch (error) {
         handleApiError(error);
