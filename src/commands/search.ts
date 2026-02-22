@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import ora from "ora";
+import inquirer from "inquirer";
 import { getApiClient, handleApiError } from "../api.js";
 import { getActiveAgent } from "../config.js";
 
@@ -191,6 +192,328 @@ function renderFreeFormInfo(data: any, indent: number = 0): void {
   }
 }
 
+// ── Render a single product info result (reusable by both `info` command and interactive mode) ──
+
+function renderProductInfo(
+  result: any,
+  index: number,
+  totalResults: number,
+  formatPriceFn: (cents: number, currency: string) => string,
+): void {
+  const num = index + 1;
+
+  // Header
+  const storeBadge = result.storeName
+    ? chalk.dim(` from ${result.storeName}`)
+    : "";
+
+  console.log(
+    `  ${chalk.dim(`[${num}]`)} ${chalk.bold.cyan(result.info?.title || result.info?.product_id || result.productId)}${storeBadge}`
+  );
+  console.log(`      ${chalk.dim(`ID: ${result.productId}`)}`);
+
+  if (result.error) {
+    console.log(`      ${chalk.red(`Error: ${result.error}`)}`);
+    console.log();
+    return;
+  }
+
+  // Product URL (if available)
+  if (result.info?.product_url) {
+    console.log(`      ${chalk.blue.underline(result.info.product_url)}`);
+  }
+
+  console.log();
+
+  // Render all the free-form info from the store
+  const info = result.info || {};
+
+  // Price display (if available)
+  if (info.price) {
+    const priceStr = info.price.amount && info.price.currency
+      ? formatPriceFn(Math.round(parseFloat(info.price.amount) * 100), info.price.currency)
+      : `${info.price.amount || "N/A"}`;
+    let priceLine = `      ${chalk.bold("Price:")} ${chalk.bold.white(priceStr)}`;
+
+    if (info.list_price?.amount) {
+      const listStr = formatPriceFn(
+        Math.round(parseFloat(info.list_price.amount) * 100),
+        info.list_price.currency || info.price.currency
+      );
+      priceLine += chalk.dim.strikethrough(` ${listStr}`);
+    }
+    console.log(priceLine);
+  }
+
+  // Pricing object (from darkstore format)
+  if (info.pricing && !info.price) {
+    const priceStr = info.pricing.amount && info.pricing.currency
+      ? formatPriceFn(Math.round(parseFloat(info.pricing.amount) * 100), info.pricing.currency)
+      : `${info.pricing.amount || "N/A"}`;
+    let priceLine = `      ${chalk.bold("Price:")} ${chalk.bold.white(priceStr)}`;
+    if (info.pricing.compare_at) {
+      const listStr = formatPriceFn(
+        Math.round(parseFloat(info.pricing.compare_at) * 100),
+        info.pricing.currency
+      );
+      priceLine += chalk.dim.strikethrough(` ${listStr}`);
+    }
+    console.log(priceLine);
+  }
+
+  // Rating
+  if (info.rating) {
+    const ratingScore = typeof info.rating === "object"
+      ? `${info.rating.score}/${info.rating.max}`
+      : String(info.rating);
+    let ratingLine = `      ${chalk.bold("Rating:")} ${chalk.yellow(ratingScore)}`;
+    if (info.review_count) {
+      ratingLine += chalk.dim(` (${info.review_count.toLocaleString()} reviews)`);
+    }
+    console.log(ratingLine);
+  }
+
+  // Brand
+  if (info.brand) {
+    console.log(`      ${chalk.bold("Brand:")} ${info.brand}`);
+  }
+
+  // Marketplace
+  if (info.marketplace) {
+    console.log(`      ${chalk.bold("Marketplace:")} ${info.marketplace.name || info.marketplace.domain || ""}`);
+  }
+
+  // Availability
+  if (info.availability) {
+    if (typeof info.availability === "string") {
+      const isInStock = info.availability.toLowerCase().includes("in stock");
+      console.log(`      ${chalk.bold("Availability:")} ${isInStock ? chalk.green(info.availability) : chalk.yellow(info.availability)}`);
+    } else if (typeof info.availability === "object") {
+      const status = info.availability.in_stock
+        ? chalk.green("In Stock")
+        : chalk.red("Out of Stock");
+      let availLine = `      ${chalk.bold("Availability:")} ${status}`;
+      if (info.availability.quantity != null) {
+        availLine += chalk.dim(` (${info.availability.quantity} available)`);
+      }
+      console.log(availLine);
+    }
+  }
+
+  // Prime
+  if (info.prime) {
+    console.log(`      ${chalk.bold("Prime:")} ${chalk.blue("✓ Prime eligible")}`);
+  }
+
+  // Shipping
+  if (info.shipping && typeof info.shipping === "object") {
+    const parts: string[] = [];
+    if (info.shipping.free) parts.push(chalk.green("Free Shipping"));
+    if (info.shipping.estimated_days) parts.push(`${info.shipping.estimated_days}-day delivery`);
+    if (info.shipping.price?.amount) parts.push(`${info.shipping.price.amount} ${info.shipping.price.currency || ""}`);
+    if (info.shipping.weight_kg) parts.push(`${info.shipping.weight_kg}kg`);
+    if (parts.length > 0) {
+      console.log(`      ${chalk.bold("Shipping:")} ${parts.join(" · ")}`);
+    }
+  }
+
+  // Delivery info
+  if (info.delivery_info) {
+    console.log(`      ${chalk.bold("Delivery:")} ${info.delivery_info}`);
+  }
+
+  // Returns
+  if (info.returns && typeof info.returns === "object") {
+    const parts: string[] = [];
+    if (info.returns.free) parts.push(chalk.green("Free Returns"));
+    if (info.returns.window_days) parts.push(`${info.returns.window_days}-day window`);
+    if (info.returns.note) parts.push(info.returns.note);
+    if (parts.length > 0) {
+      console.log(`      ${chalk.bold("Returns:")} ${parts.join(" · ")}`);
+    }
+  }
+
+  // Checkout
+  if (info.checkout && typeof info.checkout === "object") {
+    const parts: string[] = [];
+    if (info.checkout.mode) parts.push(info.checkout.mode);
+    if (info.checkout.note) parts.push(info.checkout.note);
+    if (parts.length > 0) {
+      console.log(`      ${chalk.bold("Checkout:")} ${parts.join(" — ")}`);
+    }
+  }
+
+  // Seller
+  if (info.sold_by) {
+    console.log(`      ${chalk.bold("Sold by:")} ${info.sold_by}`);
+  }
+
+  // Categories
+  if (info.categories && Array.isArray(info.categories)) {
+    console.log(`      ${chalk.bold("Category:")} ${info.categories.join(" > ")}`);
+  }
+
+  console.log();
+
+  // Features / bullet points
+  if (info.features && Array.isArray(info.features) && info.features.length > 0) {
+    console.log(`      ${chalk.bold("Key Features:")}`);
+    for (const feature of info.features) {
+      if (feature.length > 80) {
+        const words = feature.split(/\s+/);
+        let line = "";
+        let first = true;
+        for (const word of words) {
+          if (line.length + word.length + 1 > 76) {
+            if (first) {
+              console.log(`        ${chalk.dim("•")} ${line}`);
+              first = false;
+            } else {
+              console.log(`          ${line}`);
+            }
+            line = word;
+          } else {
+            line = line ? `${line} ${word}` : word;
+          }
+        }
+        if (line) {
+          if (first) {
+            console.log(`        ${chalk.dim("•")} ${line}`);
+          } else {
+            console.log(`          ${line}`);
+          }
+        }
+      } else {
+        console.log(`        ${chalk.dim("•")} ${feature}`);
+      }
+    }
+    console.log();
+  }
+
+  // Description
+  if (info.description) {
+    console.log(`      ${chalk.bold("Description:")}`);
+    const words = info.description.split(/\s+/);
+    let line = "";
+    for (const word of words) {
+      if (line.length + word.length + 1 > 76) {
+        console.log(`        ${chalk.dim(line)}`);
+        line = word;
+      } else {
+        line = line ? `${line} ${word}` : word;
+      }
+    }
+    if (line) console.log(`        ${chalk.dim(line)}`);
+    console.log();
+  }
+
+  // Specifications table
+  if (info.specifications && typeof info.specifications === "object") {
+    const specs = info.specifications;
+    const keys = Object.keys(specs);
+    if (keys.length > 0) {
+      console.log(`      ${chalk.bold("Specifications:")}`);
+      const maxKeyLen = Math.min(30, Math.max(...keys.map((k: string) => k.length)));
+      for (const [key, value] of Object.entries(specs)) {
+        const paddedKey = key.padEnd(maxKeyLen);
+        console.log(`        ${chalk.dim(paddedKey)}  ${value}`);
+      }
+      console.log();
+    }
+  }
+
+  // Images
+  if (info.images && Array.isArray(info.images) && info.images.length > 0) {
+    console.log(`      ${chalk.bold("Images:")} ${chalk.dim(`${info.images.length} available`)}`);
+    for (let j = 0; j < Math.min(3, info.images.length); j++) {
+      console.log(`        ${chalk.dim(`[${j + 1}]`)} ${chalk.blue.underline(info.images[j])}`);
+    }
+    if (info.images.length > 3) {
+      console.log(`        ${chalk.dim(`... and ${info.images.length - 3} more`)}`);
+    }
+    console.log();
+  }
+
+  // About section (A+ content)
+  if (info.about && Array.isArray(info.about) && info.about.length > 0) {
+    console.log(`      ${chalk.bold("About This Item:")}`);
+    for (const section of info.about) {
+      const words = section.split(/\s+/);
+      let line = "";
+      for (const word of words) {
+        if (line.length + word.length + 1 > 76) {
+          console.log(`        ${chalk.dim(line)}`);
+          line = word;
+        } else {
+          line = line ? `${line} ${word}` : word;
+        }
+      }
+      if (line) console.log(`        ${chalk.dim(line)}`);
+      console.log();
+    }
+  }
+
+  // SEO info
+  if (info.seo && typeof info.seo === "object" && Object.keys(info.seo).length > 0) {
+    if (info.seo.title || info.seo.description) {
+      console.log(`      ${chalk.bold("SEO:")}`);
+      if (info.seo.title) console.log(`        Title: ${info.seo.title}`);
+      if (info.seo.description) console.log(`        Description: ${info.seo.description}`);
+      console.log();
+    }
+  }
+
+  // Any remaining fields not handled above (free-form catch-all)
+  const handledKeys = new Set([
+    "product_id", "title", "price", "list_price", "pricing", "rating",
+    "review_count", "brand", "marketplace", "availability", "prime",
+    "shipping", "delivery_info", "returns", "checkout", "sold_by",
+    "categories", "features", "description", "specifications",
+    "images", "about", "seo", "product_url", "asin", "error",
+    "available", "note", "updated_at", "sku", "model", "gtin",
+    "variant", "tags",
+  ]);
+
+  const extraKeys = Object.keys(info).filter((k: string) => !handledKeys.has(k));
+  if (extraKeys.length > 0) {
+    console.log(`      ${chalk.bold("Additional Information:")}`);
+    for (const key of extraKeys) {
+      const value = info[key];
+      if (value == null) continue;
+      const label = key.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+        console.log(`        ${chalk.dim(label + ":")} ${value}`);
+      } else if (Array.isArray(value)) {
+        console.log(`        ${chalk.dim(label + ":")}`);
+        renderFreeFormInfo(value, 10);
+      } else if (typeof value === "object") {
+        console.log(`        ${chalk.dim(label + ":")}`);
+        renderFreeFormInfo(value, 10);
+      }
+    }
+    console.log();
+  }
+
+  // Tags
+  if (info.tags && Array.isArray(info.tags) && info.tags.length > 0) {
+    console.log(`      ${chalk.bold("Tags:")} ${info.tags.map((t: string) => chalk.dim(`#${t}`)).join(" ")}`);
+    console.log();
+  }
+
+  // Note from store
+  if (info.note) {
+    console.log(`      ${chalk.dim(`ℹ ${info.note}`)}`);
+    console.log();
+  }
+
+  // Separator between products
+  if (index < totalResults - 1) {
+    console.log(chalk.dim("  " + "─".repeat(60)));
+    console.log();
+  }
+}
+
 export function registerSearchCommands(program: Command): void {
   // ── SEARCH ─────────────────────────────────────────────────────────
   program
@@ -258,6 +581,9 @@ export function registerSearchCommands(program: Command): void {
     .option("--json", "Output raw JSON")
     .option("--compact", "Compact one-line-per-result output")
     .option("--detailed", "Show full product details inline")
+
+    // Interactive
+    .option("-i, --interactive", "After results, interactively select products to get more info from their store")
 
     .action(async (query: string, opts) => {
       try {
@@ -682,15 +1008,142 @@ export function registerSearchCommands(program: Command): void {
           }
         }
 
-        // Show "info" tip when there are extended search results
+        // ── Interactive selection mode ──────────────────────────────
+        // When --interactive / -i is used and there are extended results,
+        // prompt the user to select products and fetch detailed info.
         const hasExtendedProducts = extended?.products?.length > 0;
-        if (hasExtendedProducts) {
+
+        if (opts.interactive && allProducts.length > 0) {
+          // Build selectable choices from all products that have an ID
+          // (both local products and extended products can be selected,
+          //  but only extended products can be queried for store info)
+          const selectableProducts = allProducts
+            .map((p, idx) => ({ product: p, index: idx }))
+            .filter((item) => item.product.id);
+
+          if (selectableProducts.length > 0) {
+            console.log(chalk.dim("  ─".repeat(30)));
+            console.log();
+
+            const choices = selectableProducts.map((item) => {
+              const p = item.product;
+              const priceStr = formatPrice(p.priceInCents, p.currency);
+              const storeStr = p.vendor || "Unknown";
+              const extLabel = p.isExtended ? chalk.magenta(" [store]") : chalk.dim(" [local]");
+              return {
+                name: `${chalk.cyan(p.name.length > 50 ? p.name.slice(0, 47) + "..." : p.name)}  ${chalk.bold(priceStr)}  ${chalk.dim(storeStr)}${extLabel}`,
+                value: item.product.id,
+                short: p.name.length > 40 ? p.name.slice(0, 37) + "..." : p.name,
+              };
+            });
+
+            const { selectedIds } = await inquirer.prompt([
+              {
+                type: "checkbox",
+                name: "selectedIds",
+                message: "Select product(s) to request more information from their store:",
+                choices,
+                pageSize: 15,
+              },
+            ]);
+
+            if (selectedIds && selectedIds.length > 0) {
+              // Separate extended vs local product IDs
+              const extendedIds = selectedIds.filter((id: string) =>
+                allProducts.find((p) => p.id === id && p.isExtended)
+              );
+              const localIds = selectedIds.filter((id: string) =>
+                allProducts.find((p) => p.id === id && !p.isExtended)
+              );
+
+              if (extendedIds.length > 0) {
+                const infoSpinner = ora(`Requesting detailed info for ${extendedIds.length} product(s) from their stores...`).start();
+
+                try {
+                  const infoRes = await api.post("/products/info", {
+                    productIds: extendedIds,
+                  }, {
+                    timeout: 30000,
+                  });
+
+                  infoSpinner.stop();
+
+                  const { results: infoResults } = infoRes.data;
+
+                  if (infoResults && infoResults.length > 0) {
+                    console.log(chalk.bold(`\n  Store Information — ${infoResults.length} result(s)\n`));
+
+                    for (let i = 0; i < infoResults.length; i++) {
+                      const infoResult = infoResults[i];
+                      renderProductInfo(infoResult, i, infoResults.length, formatPrice);
+                    }
+                  } else {
+                    console.log(chalk.yellow("\n  No additional information returned from the stores."));
+                  }
+                } catch (infoErr) {
+                  infoSpinner.stop();
+                  console.error(chalk.red("\n  Failed to fetch product info from stores."));
+                }
+              }
+
+              if (localIds.length > 0) {
+                // For local products, fetch details from the backend directly
+                for (const localId of localIds) {
+                  const detailSpinner = ora(`Fetching details for ${localId}...`).start();
+                  try {
+                    const detailRes = await api.get(`/products/${localId}`);
+                    detailSpinner.stop();
+                    const p = detailRes.data.product;
+                    if (p) {
+                      console.log();
+                      console.log(`  ${chalk.bold.cyan(p.name)}`);
+                      console.log(`      ${chalk.dim(`ID: ${p.id}`)}`);
+                      if (p.brand) console.log(`      ${chalk.bold("Brand:")} ${p.brand}`);
+                      if (p.model) console.log(`      ${chalk.bold("Model:")} ${p.model}`);
+                      if (p.sku) console.log(`      ${chalk.bold("SKU:")} ${p.sku}`);
+                      console.log(`      ${chalk.bold("Price:")} ${chalk.bold.white(formatPrice(p.priceInCents, p.currency))}`);
+                      const status = p.inStock ? chalk.green("In Stock") : chalk.red("Out of Stock");
+                      console.log(`      ${chalk.bold("Availability:")} ${status}${p.stockQuantity != null ? chalk.dim(` (${p.stockQuantity} available)`) : ""}`);
+                      if (p.freeShipping) console.log(`      ${chalk.bold("Shipping:")} ${chalk.green("Free")}`);
+                      else if (p.shippingPriceInCents != null) console.log(`      ${chalk.bold("Shipping:")} ${formatPrice(p.shippingPriceInCents, p.currency)}`);
+                      if (p.shippingDays != null) console.log(`      ${chalk.bold("Delivery:")} ${deliveryLabel(p.shippingDays)}`);
+                      if (p.freeReturns) console.log(`      ${chalk.bold("Returns:")} ${chalk.green("Free Returns")}${p.returnWindowDays ? ` · ${p.returnWindowDays}-day window` : ""}`);
+                      if (p.description) {
+                        console.log(`      ${chalk.bold("Description:")}`);
+                        const words = p.description.split(/\s+/);
+                        let line = "";
+                        for (const word of words) {
+                          if (line.length + word.length + 1 > 76) {
+                            console.log(`        ${chalk.dim(line)}`);
+                            line = word;
+                          } else {
+                            line = line ? `${line} ${word}` : word;
+                          }
+                        }
+                        if (line) console.log(`        ${chalk.dim(line)}`);
+                      }
+                      console.log();
+                    }
+                  } catch {
+                    detailSpinner.stop();
+                  }
+                }
+              }
+
+              console.log();
+            }
+          }
+        } else if (hasExtendedProducts && !opts.interactive) {
+          // Show "info" tip when there are extended results and interactive mode is off
           const sampleIds = extended.products.slice(0, 2).map((ep: any) => ep.id).join(" ");
           console.log(
             chalk.dim("  ℹ️  Tip: ") +
             chalk.white("Want more details? Request info from the store:") +
             chalk.dim(`\n         Run: `) +
             chalk.cyan(`clishop info ${sampleIds}`) +
+            chalk.dim(` or use `) +
+            chalk.cyan(`--interactive`) +
+            chalk.dim(` to select interactively`) +
             chalk.dim("\n")
           );
         }
@@ -857,322 +1310,7 @@ export function registerSearchCommands(program: Command): void {
         console.log(chalk.bold(`\nProduct Information — ${total} result(s)\n`));
 
         for (let i = 0; i < results.length; i++) {
-          const result = results[i];
-          const num = i + 1;
-
-          // Header
-          const storeBadge = result.storeName
-            ? chalk.dim(` from ${result.storeName}`)
-            : "";
-
-          console.log(
-            `  ${chalk.dim(`[${num}]`)} ${chalk.bold.cyan(result.info?.title || result.info?.product_id || result.productId)}${storeBadge}`
-          );
-          console.log(`      ${chalk.dim(`ID: ${result.productId}`)}`);
-
-          if (result.error) {
-            console.log(`      ${chalk.red(`Error: ${result.error}`)}`);
-            console.log();
-            continue;
-          }
-
-          // Product URL (if available)
-          if (result.info?.product_url) {
-            console.log(`      ${chalk.blue.underline(result.info.product_url)}`);
-          }
-
-          console.log();
-
-          // Render all the free-form info from the store
-          const info = result.info || {};
-
-          // Price display (if available)
-          if (info.price) {
-            const priceStr = info.price.amount && info.price.currency
-              ? formatPrice(Math.round(parseFloat(info.price.amount) * 100), info.price.currency)
-              : `${info.price.amount || "N/A"}`;
-            let priceLine = `      ${chalk.bold("Price:")} ${chalk.bold.white(priceStr)}`;
-
-            if (info.list_price?.amount) {
-              const listStr = formatPrice(
-                Math.round(parseFloat(info.list_price.amount) * 100),
-                info.list_price.currency || info.price.currency
-              );
-              priceLine += chalk.dim.strikethrough(` ${listStr}`);
-            }
-            console.log(priceLine);
-          }
-
-          // Pricing object (from darkstore format)
-          if (info.pricing && !info.price) {
-            const priceStr = info.pricing.amount && info.pricing.currency
-              ? formatPrice(Math.round(parseFloat(info.pricing.amount) * 100), info.pricing.currency)
-              : `${info.pricing.amount || "N/A"}`;
-            let priceLine = `      ${chalk.bold("Price:")} ${chalk.bold.white(priceStr)}`;
-            if (info.pricing.compare_at) {
-              const listStr = formatPrice(
-                Math.round(parseFloat(info.pricing.compare_at) * 100),
-                info.pricing.currency
-              );
-              priceLine += chalk.dim.strikethrough(` ${listStr}`);
-            }
-            console.log(priceLine);
-          }
-
-          // Rating
-          if (info.rating) {
-            const ratingScore = typeof info.rating === "object"
-              ? `${info.rating.score}/${info.rating.max}`
-              : String(info.rating);
-            let ratingLine = `      ${chalk.bold("Rating:")} ${chalk.yellow(ratingScore)}`;
-            if (info.review_count) {
-              ratingLine += chalk.dim(` (${info.review_count.toLocaleString()} reviews)`);
-            }
-            console.log(ratingLine);
-          }
-
-          // Brand
-          if (info.brand) {
-            console.log(`      ${chalk.bold("Brand:")} ${info.brand}`);
-          }
-
-          // Marketplace
-          if (info.marketplace) {
-            console.log(`      ${chalk.bold("Marketplace:")} ${info.marketplace.name || info.marketplace.domain || ""}`);
-          }
-
-          // Availability
-          if (info.availability) {
-            if (typeof info.availability === "string") {
-              const isInStock = info.availability.toLowerCase().includes("in stock");
-              console.log(`      ${chalk.bold("Availability:")} ${isInStock ? chalk.green(info.availability) : chalk.yellow(info.availability)}`);
-            } else if (typeof info.availability === "object") {
-              const status = info.availability.in_stock
-                ? chalk.green("In Stock")
-                : chalk.red("Out of Stock");
-              let availLine = `      ${chalk.bold("Availability:")} ${status}`;
-              if (info.availability.quantity != null) {
-                availLine += chalk.dim(` (${info.availability.quantity} available)`);
-              }
-              console.log(availLine);
-            }
-          }
-
-          // Prime
-          if (info.prime) {
-            console.log(`      ${chalk.bold("Prime:")} ${chalk.blue("✓ Prime eligible")}`);
-          }
-
-          // Shipping
-          if (info.shipping && typeof info.shipping === "object") {
-            const parts: string[] = [];
-            if (info.shipping.free) parts.push(chalk.green("Free Shipping"));
-            if (info.shipping.estimated_days) parts.push(`${info.shipping.estimated_days}-day delivery`);
-            if (info.shipping.price?.amount) parts.push(`${info.shipping.price.amount} ${info.shipping.price.currency || ""}`);
-            if (info.shipping.weight_kg) parts.push(`${info.shipping.weight_kg}kg`);
-            if (parts.length > 0) {
-              console.log(`      ${chalk.bold("Shipping:")} ${parts.join(" · ")}`);
-            }
-          }
-
-          // Delivery info
-          if (info.delivery_info) {
-            console.log(`      ${chalk.bold("Delivery:")} ${info.delivery_info}`);
-          }
-
-          // Returns
-          if (info.returns && typeof info.returns === "object") {
-            const parts: string[] = [];
-            if (info.returns.free) parts.push(chalk.green("Free Returns"));
-            if (info.returns.window_days) parts.push(`${info.returns.window_days}-day window`);
-            if (info.returns.note) parts.push(info.returns.note);
-            if (parts.length > 0) {
-              console.log(`      ${chalk.bold("Returns:")} ${parts.join(" · ")}`);
-            }
-          }
-
-          // Checkout
-          if (info.checkout && typeof info.checkout === "object") {
-            const parts: string[] = [];
-            if (info.checkout.mode) parts.push(info.checkout.mode);
-            if (info.checkout.note) parts.push(info.checkout.note);
-            if (parts.length > 0) {
-              console.log(`      ${chalk.bold("Checkout:")} ${parts.join(" — ")}`);
-            }
-          }
-
-          // Seller
-          if (info.sold_by) {
-            console.log(`      ${chalk.bold("Sold by:")} ${info.sold_by}`);
-          }
-
-          // Categories
-          if (info.categories && Array.isArray(info.categories)) {
-            console.log(`      ${chalk.bold("Category:")} ${info.categories.join(" > ")}`);
-          }
-
-          console.log();
-
-          // Features / bullet points
-          if (info.features && Array.isArray(info.features) && info.features.length > 0) {
-            console.log(`      ${chalk.bold("Key Features:")}`);
-            for (const feature of info.features) {
-              // Wrap long features
-              if (feature.length > 80) {
-                const words = feature.split(/\s+/);
-                let line = "";
-                let first = true;
-                for (const word of words) {
-                  if (line.length + word.length + 1 > 76) {
-                    if (first) {
-                      console.log(`        ${chalk.dim("•")} ${line}`);
-                      first = false;
-                    } else {
-                      console.log(`          ${line}`);
-                    }
-                    line = word;
-                  } else {
-                    line = line ? `${line} ${word}` : word;
-                  }
-                }
-                if (line) {
-                  if (first) {
-                    console.log(`        ${chalk.dim("•")} ${line}`);
-                  } else {
-                    console.log(`          ${line}`);
-                  }
-                }
-              } else {
-                console.log(`        ${chalk.dim("•")} ${feature}`);
-              }
-            }
-            console.log();
-          }
-
-          // Description
-          if (info.description) {
-            console.log(`      ${chalk.bold("Description:")}`);
-            // Wrap long descriptions
-            const words = info.description.split(/\s+/);
-            let line = "";
-            for (const word of words) {
-              if (line.length + word.length + 1 > 76) {
-                console.log(`        ${chalk.dim(line)}`);
-                line = word;
-              } else {
-                line = line ? `${line} ${word}` : word;
-              }
-            }
-            if (line) console.log(`        ${chalk.dim(line)}`);
-            console.log();
-          }
-
-          // Specifications table
-          if (info.specifications && typeof info.specifications === "object") {
-            const specs = info.specifications;
-            const keys = Object.keys(specs);
-            if (keys.length > 0) {
-              console.log(`      ${chalk.bold("Specifications:")}`);
-              const maxKeyLen = Math.min(30, Math.max(...keys.map((k) => k.length)));
-              for (const [key, value] of Object.entries(specs)) {
-                const paddedKey = key.padEnd(maxKeyLen);
-                console.log(`        ${chalk.dim(paddedKey)}  ${value}`);
-              }
-              console.log();
-            }
-          }
-
-          // Images
-          if (info.images && Array.isArray(info.images) && info.images.length > 0) {
-            console.log(`      ${chalk.bold("Images:")} ${chalk.dim(`${info.images.length} available`)}`);
-            // Show first 3 image URLs
-            for (let j = 0; j < Math.min(3, info.images.length); j++) {
-              console.log(`        ${chalk.dim(`[${j + 1}]`)} ${chalk.blue.underline(info.images[j])}`);
-            }
-            if (info.images.length > 3) {
-              console.log(`        ${chalk.dim(`... and ${info.images.length - 3} more`)}`);
-            }
-            console.log();
-          }
-
-          // About section (A+ content)
-          if (info.about && Array.isArray(info.about) && info.about.length > 0) {
-            console.log(`      ${chalk.bold("About This Item:")}`);
-            for (const section of info.about) {
-              const words = section.split(/\s+/);
-              let line = "";
-              for (const word of words) {
-                if (line.length + word.length + 1 > 76) {
-                  console.log(`        ${chalk.dim(line)}`);
-                  line = word;
-                } else {
-                  line = line ? `${line} ${word}` : word;
-                }
-              }
-              if (line) console.log(`        ${chalk.dim(line)}`);
-              console.log();
-            }
-          }
-
-          // SEO info
-          if (info.seo && typeof info.seo === "object" && Object.keys(info.seo).length > 0) {
-            if (info.seo.title || info.seo.description) {
-              console.log(`      ${chalk.bold("SEO:")}`);
-              if (info.seo.title) console.log(`        Title: ${info.seo.title}`);
-              if (info.seo.description) console.log(`        Description: ${info.seo.description}`);
-              console.log();
-            }
-          }
-
-          // Any remaining fields not handled above (free-form catch-all)
-          const handledKeys = new Set([
-            "product_id", "title", "price", "list_price", "pricing", "rating",
-            "review_count", "brand", "marketplace", "availability", "prime",
-            "shipping", "delivery_info", "returns", "checkout", "sold_by",
-            "categories", "features", "description", "specifications",
-            "images", "about", "seo", "product_url", "asin", "error",
-            "available", "note", "updated_at", "sku", "model", "gtin",
-            "variant", "tags",
-          ]);
-
-          const extraKeys = Object.keys(info).filter((k) => !handledKeys.has(k));
-          if (extraKeys.length > 0) {
-            console.log(`      ${chalk.bold("Additional Information:")}`);
-            for (const key of extraKeys) {
-              const value = info[key];
-              if (value == null) continue;
-              const label = key.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
-
-              if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-                console.log(`        ${chalk.dim(label + ":")} ${value}`);
-              } else if (Array.isArray(value)) {
-                console.log(`        ${chalk.dim(label + ":")}`);
-                renderFreeFormInfo(value, 10);
-              } else if (typeof value === "object") {
-                console.log(`        ${chalk.dim(label + ":")}`);
-                renderFreeFormInfo(value, 10);
-              }
-            }
-            console.log();
-          }
-
-          // Tags
-          if (info.tags && Array.isArray(info.tags) && info.tags.length > 0) {
-            console.log(`      ${chalk.bold("Tags:")} ${info.tags.map((t: string) => chalk.dim(`#${t}`)).join(" ")}`);
-            console.log();
-          }
-
-          // Note from store
-          if (info.note) {
-            console.log(`      ${chalk.dim(`ℹ ${info.note}`)}`);
-            console.log();
-          }
-
-          // Separator between products
-          if (i < results.length - 1) {
-            console.log(chalk.dim("  " + "─".repeat(60)));
-            console.log();
-          }
+          renderProductInfo(results[i], i, results.length, formatPrice);
         }
       } catch (error) {
         handleApiError(error);
