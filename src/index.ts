@@ -14,6 +14,7 @@ import { registerStoreCommands } from "./commands/store.js";
 import { registerStatusCommand } from "./commands/status.js";
 import { registerSetupCommand, runSetupWizard } from "./commands/setup.js";
 import { registerAdvertiseCommands } from "./commands/advertise.js";
+import { registerSupportCommands } from "./commands/support.js";
 import { getConfig } from "./config.js";
 
 const program = new Command();
@@ -54,6 +55,7 @@ registerStoreCommands(program);
 registerStatusCommand(program);
 registerSetupCommand(program);
 registerAdvertiseCommands(program);
+registerSupportCommands(program);
 
 // Main entry with first-run detection
 async function main() {
