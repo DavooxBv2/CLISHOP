@@ -2,12 +2,25 @@ import { Command } from "commander";
 import chalk from "chalk";
 import ora from "ora";
 import inquirer from "inquirer";
-import terminalImage from "terminal-image";
+import sharp from "sharp";
 import { getApiClient, handleApiError } from "../api.js";
 import { getActiveAgent } from "../config.js";
 
-// ── Helper: download an image URL and render it in the terminal ─────────
-async function renderImageInline(imageUrl: string, widthCols = 48): Promise<void> {
+// ── Helper: render an image in the terminal using ANSI truecolor ────────
+// Uses sharp to decode/resize, then renders with half-block characters (▄)
+// and explicit 24-bit ANSI color codes. Works cross-platform on any
+// terminal that supports truecolor (Windows Terminal, iTerm2, most Linux terms).
+const UPPER_HALF = "\u2580"; // ▀
+const RESET = "\x1b[0m";
+
+function ansiTruecolorFg(r: number, g: number, b: number): string {
+  return `\x1b[38;2;${r};${g};${b}m`;
+}
+function ansiTruecolorBg(r: number, g: number, b: number): string {
+  return `\x1b[48;2;${r};${g};${b}m`;
+}
+
+async function renderImageInline(imageUrl: string, widthCols = 40): Promise<void> {
   try {
     const axios = (await import("axios")).default;
     const response = await axios.get(imageUrl, {
@@ -17,17 +30,43 @@ async function renderImageInline(imageUrl: string, widthCols = 48): Promise<void
         "User-Agent": "Mozilla/5.0 (compatible; CLIShop/1.0)",
       },
     });
-    const buffer = Buffer.from(response.data);
-    const rendered = await terminalImage.buffer(buffer, {
-      width: widthCols,
-      preserveAspectRatio: true,
-    });
-    // Indent each line to align with the product info
-    const indented = rendered
-      .split("\n")
-      .map((line: string) => `      ${line}`)
-      .join("\n");
-    console.log(indented);
+
+    // Decode + resize image to fit terminal width
+    const resized = sharp(Buffer.from(response.data))
+      .resize(widthCols, undefined, { fit: "inside" })
+      .removeAlpha()
+      .raw();
+
+    const { data, info } = await resized.toBuffer({ resolveWithObject: true });
+    const { width, height } = info;
+    const pixels = new Uint8Array(data);
+
+    // Get pixel (r,g,b) at position
+    const px = (x: number, y: number): [number, number, number] => {
+      const i = (y * width + x) * 3;
+      return [pixels[i], pixels[i + 1], pixels[i + 2]];
+    };
+
+    // Render two rows per terminal line using the half-block trick:
+    // foreground = top pixel, background = bottom pixel, char = ▀
+    const lines: string[] = [];
+    for (let y = 0; y < height; y += 2) {
+      let line = "      "; // indent
+      for (let x = 0; x < width; x++) {
+        const [tr, tg, tb] = px(x, y); // top pixel
+        if (y + 1 < height) {
+          const [br, bg, bb] = px(x, y + 1); // bottom pixel
+          line += `${ansiTruecolorFg(tr, tg, tb)}${ansiTruecolorBg(br, bg, bb)}${UPPER_HALF}`;
+        } else {
+          // Odd height — last row has no bottom pixel
+          line += `${ansiTruecolorFg(tr, tg, tb)}${UPPER_HALF}`;
+        }
+      }
+      line += RESET;
+      lines.push(line);
+    }
+
+    console.log(lines.join("\n"));
   } catch {
     // Silently skip — image rendering is best-effort
     console.log(chalk.dim(`      (Could not render image preview)`));
