@@ -17,6 +17,7 @@ export interface Order {
   paymentMethodId: string;
   paymentLabel?: string;
   agent: string;
+  externalOrderId?: string | null;
   createdAt: string;
   updatedAt: string;
   shipments?: Shipment[];
@@ -81,13 +82,35 @@ export function registerOrderCommands(program: Command): void {
           return;
         }
 
-        // Fetch product info for confirmation
+        // Fetch product info for confirmation — try regular products first, then extended
         const api = getApiClient();
         const prodSpinner = ora("Fetching product info...").start();
-        const prodRes = await api.get(`/products/${productId}`);
+        let product: any;
+        let isExtended = false;
+        try {
+          const prodRes = await api.get(`/products/${productId}`);
+          product = prodRes.data.product;
+        } catch (err: any) {
+          if (err?.response?.status === 404) {
+            // Try extended (search result) product
+            try {
+              const extRes = await api.get(`/products/extended/${productId}`);
+              product = extRes.data.product;
+              isExtended = true;
+            } catch {
+              prodSpinner.stop();
+              console.error(chalk.red(`\n✗ Product ${productId} not found.`));
+              process.exitCode = 1;
+              return;
+            }
+          } else {
+            prodSpinner.stop();
+            throw err;
+          }
+        }
         prodSpinner.stop();
-        const product = prodRes.data.product;
 
+        // Handoff products are now transparently handled — CLISHOP procures on behalf of the user
         const totalCents = product.priceInCents * opts.quantity;
 
         // Safety check: max order amount (local agent config is in dollars)
@@ -228,6 +251,9 @@ export function registerOrderCommands(program: Command): void {
         if (o.paymentLabel) console.log(`  Payment:  ${o.paymentLabel}`);
         console.log(`  Placed:   ${new Date(o.createdAt).toLocaleString()}`);
         console.log(`  Updated:  ${new Date(o.updatedAt).toLocaleString()}`);
+        if (o.externalOrderId) {
+          console.log(`  eBay Ref: ${chalk.dim(o.externalOrderId)}`);
+        }
         if (o.shipments?.length) {
           for (const s of o.shipments) {
             console.log(`  Tracking: ${s.trackingNumber || "pending"} ${s.carrier ? `(${s.carrier})` : ""}`);
@@ -237,6 +263,43 @@ export function registerOrderCommands(program: Command): void {
         console.log(chalk.bold("\n  Items:"));
         for (const item of o.items) {
           console.log(`    · ${item.productName} × ${item.quantity}  ${formatPrice(item.totalPriceInCents, o.currency)}`);
+        }
+
+        // Fetch live tracking from vendor if order has an external reference
+        if (o.externalOrderId && !o.externalOrderId.startsWith("pend_")) {
+          try {
+            const trackRes = await api.get(`/orders/${id}/tracking`);
+            const { tracking } = trackRes.data;
+            if (tracking) {
+              const ebayStatus = tracking.status || "UNKNOWN";
+              const STATUS_MAP: Record<string, string> = {
+                PENDING_AVAILABILITY: "Pending",
+                PENDING_PAYMENT: "Awaiting payment",
+                PAYMENT_PROCESSING: "Payment processing",
+                FULFILLMENT_IN_PROGRESS: "Being packed",
+                FULFILLED: "Fulfilled",
+                CANCELLED: "Cancelled",
+              };
+              console.log(chalk.bold("\n  eBay Status:"));
+              console.log(`    ${chalk.cyan(STATUS_MAP[ebayStatus] || ebayStatus)}`);
+              for (const li of tracking.line_items || []) {
+                if (li.tracking_number) {
+                  console.log(`    Tracking: ${chalk.bold(li.tracking_number)}${li.carrier ? ` (${li.carrier})` : ""}`);
+                }
+                if (li.tracking_url) {
+                  console.log(`    Track:    ${chalk.cyan.underline(li.tracking_url)}`);
+                }
+                if (li.estimated_delivery) {
+                  const eta = new Date(li.estimated_delivery).toLocaleDateString();
+                  console.log(`    ETA:      ${eta}`);
+                }
+              }
+            } else if (trackRes.data.message) {
+              console.log(chalk.dim(`\n  Vendor: ${trackRes.data.message}`));
+            }
+          } catch {
+            // Tracking fetch failed silently — don't break order display
+          }
         }
         console.log();
       } catch (error) {

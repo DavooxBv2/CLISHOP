@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean --target node18",
-    "dev": "ts-node --esm src/index.ts",
+    "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
     "lint": "tsc --noEmit"
   },
@@ -16,7 +16,11 @@
     "type": "git",
     "url": "git+https://github.com/DavooxBv2/CLISHOP.git"
   },
-  "keywords": ["cli", "shopping", "ordering"],
+  "keywords": [
+    "cli",
+    "shopping",
+    "ordering"
+  ],
   "author": "",
   "license": "ISC",
   "type": "module",
@@ -42,6 +46,7 @@
     "@types/node": "^25.2.3",
     "ts-node": "^10.9.2",
     "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
 }
