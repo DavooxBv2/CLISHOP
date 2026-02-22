@@ -2,8 +2,37 @@ import { Command } from "commander";
 import chalk from "chalk";
 import ora from "ora";
 import inquirer from "inquirer";
+import terminalImage from "terminal-image";
 import { getApiClient, handleApiError } from "../api.js";
 import { getActiveAgent } from "../config.js";
+
+// ── Helper: download an image URL and render it in the terminal ─────────
+async function renderImageInline(imageUrl: string, widthCols = 48): Promise<void> {
+  try {
+    const axios = (await import("axios")).default;
+    const response = await axios.get(imageUrl, {
+      responseType: "arraybuffer",
+      timeout: 8000,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; CLIShop/1.0)",
+      },
+    });
+    const buffer = Buffer.from(response.data);
+    const rendered = await terminalImage.buffer(buffer, {
+      width: widthCols,
+      preserveAspectRatio: true,
+    });
+    // Indent each line to align with the product info
+    const indented = rendered
+      .split("\n")
+      .map((line: string) => `      ${line}`)
+      .join("\n");
+    console.log(indented);
+  } catch {
+    // Silently skip — image rendering is best-effort
+    console.log(chalk.dim(`      (Could not render image preview)`));
+  }
+}
 
 export interface Product {
   id: string;
@@ -194,12 +223,12 @@ function renderFreeFormInfo(data: any, indent: number = 0): void {
 
 // ── Render a single product info result (reusable by both `info` command and interactive mode) ──
 
-function renderProductInfo(
+async function renderProductInfo(
   result: any,
   index: number,
   totalResults: number,
   formatPriceFn: (cents: number, currency: string) => string,
-): void {
+): Promise<void> {
   const num = index + 1;
 
   // Header
@@ -425,6 +454,10 @@ function renderProductInfo(
   // Images
   if (info.images && Array.isArray(info.images) && info.images.length > 0) {
     console.log(`      ${chalk.bold("Images:")} ${chalk.dim(`${info.images.length} available`)}`);
+
+    // Render the first image inline in the terminal
+    await renderImageInline(info.images[0]);
+
     for (let j = 0; j < Math.min(3, info.images.length); j++) {
       console.log(`        ${chalk.dim(`[${j + 1}]`)} ${chalk.blue.underline(info.images[j])}`);
     }
@@ -1075,7 +1108,7 @@ export function registerSearchCommands(program: Command): void {
 
                     for (let i = 0; i < infoResults.length; i++) {
                       const infoResult = infoResults[i];
-                      renderProductInfo(infoResult, i, infoResults.length, formatPrice);
+                      await renderProductInfo(infoResult, i, infoResults.length, formatPrice);
                     }
                   } else {
                     console.log(chalk.yellow("\n  No additional information returned from the stores."));
@@ -1310,7 +1343,7 @@ export function registerSearchCommands(program: Command): void {
         console.log(chalk.bold(`\nProduct Information — ${total} result(s)\n`));
 
         for (let i = 0; i < results.length; i++) {
-          renderProductInfo(results[i], i, results.length, formatPrice);
+          await renderProductInfo(results[i], i, results.length, formatPrice);
         }
       } catch (error) {
         handleApiError(error);
