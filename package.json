@@ -7,7 +7,7 @@
     "clishop": "dist/index.js"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean --target node18",
+    "build": "tsup src/index.ts --format esm --dts --clean --target node18 --external terminal-image",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
     "lint": "tsc --noEmit"
