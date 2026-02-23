@@ -118,6 +118,7 @@ clishop store list --json
 clishop status --json
 clishop advertise list --json
 clishop support list --json
+clishop feedback list --json
 ```
 
 ### Exit codes
@@ -185,6 +186,7 @@ All entities use short, prefixed IDs:
 | `user_` | User | `user_f5h8k3n9s6v2` |
 | `agnt_` | Agent | `agnt_g6j9l4p1t7w3` |
 | `chkt_` | Checkout | `chkt_h7k1m5q2u8x4` |
+| `fdbk_` | Feedback | `fdbk_i8l2n6r3v9y5` |
 
 ### Money
 
@@ -328,6 +330,55 @@ clishop support show <ticketId>            # View ticket + messages
 clishop support reply <ticketId>           # Reply to a ticket
 clishop support close <ticketId>           # Close a ticket
 ```
+
+### Bug Reports & Suggestions
+
+Found a bug? Have an idea to make CLISHOP better? Report it directly from the terminal:
+
+```bash
+# Report a bug (interactive — prompts for details)
+clishop feedback bug
+
+# Report a bug (non-interactive — for agents/scripts)
+clishop feedback bug \
+  --title "Search crashes on empty query" \
+  --description "Running search with no query causes unhandled error" \
+  --steps "1. Run: clishop search \"\"\n2. Observe crash" \
+  --actual "CLI exits with stack trace" \
+  --expected "Should show a friendly 'query required' error"
+
+# Submit a suggestion (interactive)
+clishop feedback suggest
+
+# Submit a suggestion (non-interactive)
+clishop feedback suggest \
+  --title "Add wishlist feature" \
+  --description "Would be great to save products to a wishlist for later"
+
+# List your feedback
+clishop feedback list                      # All feedback
+clishop feedback list --type bug           # Only bug reports
+clishop feedback list --type suggestion    # Only suggestions
+clishop feedback list --status fixed       # Filter by status
+clishop feedback list --json               # JSON output
+
+# View a specific report
+clishop feedback show <id>                 # View details + status
+clishop feedback show <id> --json          # JSON output
+```
+
+**Bug report fields:**
+| Field | Description |
+|-------|-------------|
+| `title` | Short summary of the bug |
+| `description` | General description |
+| `steps` | How to trigger the bug (steps to reproduce) |
+| `actual` | What actually happens |
+| `expected` | What you expected to happen |
+
+**Feedback statuses:** `open`, `acknowledged`, `in_progress`, `fixed`, `wont_fix`, `closed`
+
+The CLISHOP team reviews all feedback and updates the status. You'll see admin notes when you check your feedback with `clishop feedback show <id>`.
 
 ### Account & Config
 
