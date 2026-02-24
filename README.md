@@ -70,7 +70,7 @@ CLISHOP is designed to be called by AI agents, scripts, and automation pipelines
 ### Authenticate
 
 ```bash
-clishop login --email <email> --password <password>
+echo "<password>" | clishop login --email <email> --password-stdin
 ```
 
 ### Search → Buy flow
@@ -412,6 +412,8 @@ clishop config path
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `CLISHOP_API_URL` | Override the backend API URL | `https://clishop-backend.vercel.app/api` |
+
+`CLISHOP_API_URL` takes precedence over the local `config.apiBaseUrl` value.
 
 ## Architecture
 

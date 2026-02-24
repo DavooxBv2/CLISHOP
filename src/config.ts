@@ -43,6 +43,8 @@ const DEFAULT_AGENT: AgentConfig = {
   blockedCategories: [],
 };
 
+export const DEFAULT_API_BASE_URL = "https://clishop-backend.vercel.app/api";
+
 const config = new Conf<AppConfig>({
   projectName: "clishop",
   defaults: {
@@ -50,7 +52,7 @@ const config = new Conf<AppConfig>({
     agents: {
       default: DEFAULT_AGENT,
     },
-    apiBaseUrl: "https://clishop-backend.vercel.app/api",
+    apiBaseUrl: DEFAULT_API_BASE_URL,
     outputFormat: "human",
     setupCompleted: false,
   },
@@ -58,6 +60,12 @@ const config = new Conf<AppConfig>({
 
 export function getConfig(): Conf<AppConfig> {
   return config;
+}
+
+export function getApiBaseUrl(): string {
+  const envOverride = process.env.CLISHOP_API_URL?.trim();
+  if (envOverride) return envOverride;
+  return config.get("apiBaseUrl") || DEFAULT_API_BASE_URL;
 }
 
 export function getActiveAgent(): AgentConfig {
