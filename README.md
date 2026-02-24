@@ -13,6 +13,19 @@
 
 ---
 
+## Works with
+
+<p>
+  <img alt="Claude" src="https://img.shields.io/badge/Claude-Supported-7C3AED?style=for-the-badge&logo=anthropic&logoColor=white" />
+  <img alt="GPT" src="https://img.shields.io/badge/GPT-Supported-10A37F?style=for-the-badge&logo=openai&logoColor=white" />
+  <img alt="Gemini" src="https://img.shields.io/badge/Gemini-Supported-4285F4?style=for-the-badge&logo=googlegemini&logoColor=white" />
+</p>
+<p>
+  <img alt="AutoGPT" src="https://img.shields.io/badge/AutoGPT-Open--source%20agent-111827?style=for-the-badge&logo=github&logoColor=white" />
+  <img alt="CrewAI" src="https://img.shields.io/badge/CrewAI-Open--source%20agent-0EA5E9?style=for-the-badge&logo=crewai&logoColor=white" />
+  <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-Open--source%20agent-16A34A?style=for-the-badge&logo=langchain&logoColor=white" />
+</p>
+
 CLISHOP lets AI agents and scripts autonomously search for products across multiple stores, compare prices, and place orders — entirely through a command-line interface. No browser. No GUI. Just `stdin`/`stdout`.
 
 Built for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) era, where AI agents need tool-use interfaces to interact with the real world.
