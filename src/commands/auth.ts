@@ -4,15 +4,30 @@ import ora from "ora";
 import inquirer from "inquirer";
 import { login, register, logout, isLoggedIn, getUserInfo } from "../auth.js";
 
+async function readPasswordFromStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+  }
+  return Buffer.concat(chunks).toString("utf8").trim();
+}
+
 export function registerAuthCommands(program: Command): void {
   // ── LOGIN ─────────────────────────────────────────────────────────
   program
     .command("login")
     .description("Log in to your CLISHOP account")
     .option("-e, --email <email>", "Email address")
-    .option("-p, --password <password>", "Password (omit for secure prompt)")
+    .option("-p, --password <password>", "Password (less secure: exposed to shell history)")
+    .option("--password-stdin", "Read password from stdin")
     .action(async (opts) => {
       try {
+        if (opts.password && opts.passwordStdin) {
+          console.error(chalk.red("\n✗ Use either --password or --password-stdin, not both."));
+          process.exitCode = 1;
+          return;
+        }
+
         if (await isLoggedIn()) {
           const user = await getUserInfo();
           const { confirm } = await inquirer.prompt([
@@ -28,6 +43,20 @@ export function registerAuthCommands(program: Command): void {
 
         let email = opts.email;
         let password = opts.password;
+
+        if (opts.passwordStdin) {
+          password = await readPasswordFromStdin();
+          if (!password) {
+            console.error(chalk.red("\n✗ No password was provided on stdin."));
+            process.exitCode = 1;
+            return;
+          }
+        }
+
+        if (opts.password) {
+          console.log(chalk.yellow("⚠ Warning: --password can leak credentials via shell history/process list."));
+          console.log(chalk.yellow("  Prefer --password-stdin or the interactive masked prompt.\n"));
+        }
 
         if (!email || !password) {
           const answers = await inquirer.prompt([

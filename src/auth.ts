@@ -1,6 +1,6 @@
 import keytar from "keytar";
 import axios from "axios";
-import { getConfig } from "./config.js";
+import { getApiBaseUrl } from "./config.js";
 
 const SERVICE_NAME = "clishop";
 const ACCOUNT_TOKEN = "auth-token";
@@ -11,6 +11,32 @@ export interface UserInfo {
   id: string;
   email: string;
   name: string;
+}
+
+interface AuthResponse {
+  token: string;
+  refreshToken?: string;
+  user: UserInfo;
+}
+
+function assertAuthResponse(data: unknown): AuthResponse {
+  const payload = data as Partial<AuthResponse>;
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Invalid auth response from server.");
+  }
+  if (!payload.token || typeof payload.token !== "string") {
+    throw new Error("Auth response missing access token.");
+  }
+  if (payload.refreshToken !== undefined && typeof payload.refreshToken !== "string") {
+    throw new Error("Auth response has an invalid refresh token.");
+  }
+  if (!payload.user || typeof payload.user !== "object") {
+    throw new Error("Auth response missing user profile.");
+  }
+  if (!payload.user.id || !payload.user.email || !payload.user.name) {
+    throw new Error("Auth response user profile is incomplete.");
+  }
+  return payload as AuthResponse;
 }
 
 /**
@@ -62,12 +88,10 @@ export async function isLoggedIn(): Promise<boolean> {
  * Returns the user info on success.
  */
 export async function login(email: string, password: string): Promise<UserInfo> {
-  const config = getConfig();
-  const baseUrl = config.get("apiBaseUrl");
+  const baseUrl = getApiBaseUrl();
 
   const res = await axios.post(`${baseUrl}/auth/login`, { email, password });
-
-  const { token, refreshToken, user } = res.data;
+  const { token, refreshToken, user } = assertAuthResponse(res.data);
 
   await storeToken(token);
   if (refreshToken) await storeRefreshToken(refreshToken);
@@ -80,12 +104,10 @@ export async function login(email: string, password: string): Promise<UserInfo> 
  * Register a new account.
  */
 export async function register(email: string, password: string, name: string): Promise<UserInfo> {
-  const config = getConfig();
-  const baseUrl = config.get("apiBaseUrl");
+  const baseUrl = getApiBaseUrl();
 
   const res = await axios.post(`${baseUrl}/auth/register`, { email, password, name });
-
-  const { token, refreshToken, user } = res.data;
+  const { token, refreshToken, user } = assertAuthResponse(res.data);
 
   await storeToken(token);
   if (refreshToken) await storeRefreshToken(refreshToken);
@@ -98,8 +120,7 @@ export async function register(email: string, password: string, name: string): P
  * Logout — clear local tokens.
  */
 export async function logout(): Promise<void> {
-  const config = getConfig();
-  const baseUrl = config.get("apiBaseUrl");
+  const baseUrl = getApiBaseUrl();
   const token = await getToken();
 
   // Best-effort server-side logout

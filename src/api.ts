@@ -1,19 +1,30 @@
 import axios, { AxiosInstance, AxiosError } from "axios";
 import chalk from "chalk";
 import { getToken, getRefreshToken, storeToken } from "./auth.js";
+import { getApiBaseUrl } from "./config.js";
 
 let client: AxiosInstance | null = null;
+
+function assertRefreshResponse(data: unknown): { token: string } {
+  const payload = data as { token?: unknown };
+  if (!payload || typeof payload !== "object" || typeof payload.token !== "string") {
+    throw new Error("Invalid refresh response from server.");
+  }
+  return { token: payload.token };
+}
 
 /**
  * Get an authenticated Axios client that talks to the backend.
  * Automatically attaches the Bearer token and handles 401 refresh.
  */
-const API_BASE_URL = process.env.CLISHOP_API_URL || "https://clishop-backend.vercel.app/api";
-
 export function getApiClient(): AxiosInstance {
   if (client) return client;
 
-  const baseUrl = API_BASE_URL;
+  const baseUrl = getApiBaseUrl();
+
+  if (!baseUrl.startsWith("https://")) {
+    console.warn(chalk.yellow(`\n⚠ Using a non-HTTPS API URL: ${baseUrl}\n`));
+  }
 
   client = axios.create({
     baseURL: baseUrl,
@@ -41,10 +52,11 @@ export function getApiClient(): AxiosInstance {
         if (refreshToken) {
           try {
             const res = await axios.post(`${baseUrl}/auth/refresh`, { refreshToken });
-            await storeToken(res.data.token);
+            const { token } = assertRefreshResponse(res.data);
+            await storeToken(token);
             // Retry original request
             if (error.config) {
-              error.config.headers.Authorization = `Bearer ${res.data.token}`;
+              error.config.headers.Authorization = `Bearer ${token}`;
               return axios(error.config);
             }
           } catch {
@@ -66,7 +78,11 @@ export function getApiClient(): AxiosInstance {
  */
 export function handleApiError(error: unknown): never {
   if (axios.isAxiosError(error)) {
-    const data = error.response?.data;
+    const data = error.response?.data as {
+      message?: string;
+      error?: string;
+      errors?: Record<string, string[]>;
+    };
     const message = data?.message || data?.error || error.message;
     const status = error.response?.status;
 
