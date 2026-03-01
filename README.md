@@ -12,12 +12,27 @@
 
 ---
 
-CLISHOP is an open-source CLI that lets AI agents and humans search for products across multiple stores, compare prices, and place real orders — all from the terminal. Anyone can sell on CLISHOP using a [Dark Store](https://github.com/DavooxBv2/CLISHOP-DARKSTORE) (a store without a website).
+CLISHOP is an open-source CLI that lets AI agents and humans search for products across multiple stores, compare prices, and place real orders — all from the terminal. Anyone can sell on CLISHOP using a [Dark Store](https://github.com/DavooxBv2/CLISHOP-DARKSTORE).
+
+## Works with
+
+<p>
+  <img alt="VS Code" src="https://img.shields.io/badge/VS%20Code-Copilot-007ACC?style=for-the-badge&logo=visualstudiocode&logoColor=white" />
+  <img alt="Claude" src="https://img.shields.io/badge/Claude-Supported-7C3AED?style=for-the-badge&logo=anthropic&logoColor=white" />
+  <img alt="GPT" src="https://img.shields.io/badge/GPT-Supported-10A37F?style=for-the-badge&logo=openai&logoColor=white" />
+  <img alt="Gemini" src="https://img.shields.io/badge/Gemini-Supported-4285F4?style=for-the-badge&logo=googlegemini&logoColor=white" />
+</p>
+<p>
+  <img alt="Cursor" src="https://img.shields.io/badge/Cursor-Supported-000000?style=for-the-badge&logo=cursor&logoColor=white" />
+  <img alt="Windsurf" src="https://img.shields.io/badge/Windsurf-Supported-0EA5E9?style=for-the-badge" />
+  <img alt="AutoGPT" src="https://img.shields.io/badge/AutoGPT-Agent-111827?style=for-the-badge&logo=github&logoColor=white" />
+  <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-Agent-16A34A?style=for-the-badge&logo=langchain&logoColor=white" />
+</p>
 
 ## Highlights
 
-- **Multi-store search:** search for items that ship to your location across every store in the network at once
-- **Safety thresholds:** set spending limits per order, get email confirmation links before anything ships, or turn confirmation off entirely if you don't need it
+- **Multi-store search:** one query searches every store in the network and only returns items that ship to your address
+- **Safety thresholds:** cap how much can be spent per order, require email confirmation before anything ships, or skip confirmation entirely
 - **MCP server:** native [Model Context Protocol](https://modelcontextprotocol.io/) support with 19 tools so AI agents (VS Code Copilot, Claude, Cursor, Windsurf, etc.) can shop on your behalf
 - **Advertise requests:** can't find what you need? Publicly post a request and let stores try to find it for you
 - **Open marketplace:** anyone can start selling on CLISHOP by deploying a [Dark Store](https://github.com/DavooxBv2/CLISHOP-DARKSTORE) — no website required
