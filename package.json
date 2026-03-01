@@ -1,0 +1,65 @@
+{
+  "name": "clishop",
+  "version": "1.1.0",
+  "mcpName": "io.github.StefDCL/clishop",
+  "description": "CLISHOP — Order anything from your terminal",
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "clishop": "dist/index.js",
+    "clishop-mcp": "dist/mcp.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/index.ts",
+    "dev:mcp": "tsx src/mcp.ts",
+    "start": "node dist/index.js",
+    "start:mcp": "node dist/mcp.js",
+    "lint": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DavooxBv2/CLISHOP.git"
+  },
+  "keywords": [
+    "cli",
+    "shopping",
+    "ordering",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "agent"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "bugs": {
+    "url": "https://github.com/DavooxBv2/CLISHOP/issues"
+  },
+  "homepage": "https://github.com/DavooxBv2/CLISHOP#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "axios": "^1.13.5",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
+    "conf": "^15.1.0",
+    "inquirer": "^13.2.4",
+    "keytar": "^7.9.0",
+    "open": "^11.0.0",
+    "ora": "^9.3.0"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.9",
+    "@types/keytar": "^4.4.0",
+    "@types/node": "^25.2.3",
+    "ts-node": "^10.9.2",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

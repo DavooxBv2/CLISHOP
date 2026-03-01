@@ -1,0 +1,9 @@
+src/
+*.ts
+!dist/**
+tsconfig.json
+.cursor/
+.mcpregistry_*
+mcp-publisher.exe
+SECURITY_REVIEW.md
+node_modules/

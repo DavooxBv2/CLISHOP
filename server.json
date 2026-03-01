@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.StefDCL/clishop",
+  "description": "Order anything from your terminal — search, buy, track, and manage via MCP tools.",
+  "repository": {
+    "url": "https://github.com/DavooxBv2/CLISHOP",
+    "source": "github"
+  },
+  "version": "0.3.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "clishop",
+      "version": "0.3.0",
+      "runtime": "node",
+      "args": ["--mcp"],
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": []
+    }
+  ]
+}

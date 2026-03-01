@@ -1,0 +1,14 @@
+﻿node_modules
+dist
+.env
+.env.*
+.DS_Store
+Thumbs.db
+
+# MCP registry credentials (re-download when needed)
+.mcpregistry_*
+mcp-publisher.exe
+
+# IDE
+.cursor/
+.vscode/
