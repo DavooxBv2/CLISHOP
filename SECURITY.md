@@ -13,10 +13,6 @@ Please include:
 - Potential impact
 - Suggested remediation (if available)
 
-## Supported Versions
-
-Until a stable `1.0.0` release is published, only the latest release line is considered supported for security fixes.
-
 ## Security Expectations
 
 - Never commit secrets or tokens.
