@@ -540,14 +540,19 @@ Contributions welcome! Please open an issue first to discuss.
 4. Push (`git push origin feat/my-feature`)
 5. Open a Pull Request
 
+## Sell on CLISHOP
+
+Want to sell your own products through CLISHOP? Use the [Dark Store](https://github.com/DavooxBv2/CLISHOP-DARKSTORE) template to create your own store — no website needed. Configure your catalog, shipping, and pricing in a few YAML files, deploy to Vercel, and start receiving orders.
+
 ## Links
 
 - 🌐 **Website:** [clishop.ai](https://clishop.ai)
 - 💬 **Discord:** [discord.gg/vwXMbzD4bx](https://discord.gg/vwXMbzD4bx)
 - 📦 **npm:** [npmjs.com/package/clishop](https://www.npmjs.com/package/clishop)
+- 🏪 **Dark Store:** [github.com/DavooxBv2/CLISHOP-DARKSTORE](https://github.com/DavooxBv2/CLISHOP-DARKSTORE)
 - 📄 **Terms:** [clishop.ai/terms](https://clishop.ai/terms)
 - 🔒 **Privacy:** [clishop.ai/privacy](https://clishop.ai/privacy)
 
 ## License
 
-[ISC](LICENSE)
+[MIT](LICENSE)
