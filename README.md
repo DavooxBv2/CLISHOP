@@ -35,6 +35,7 @@ CLISHOP is an open-source CLI that lets AI agents and humans search for products
 - **Safety thresholds:** cap how much can be spent per order, require email confirmation before anything ships, or skip confirmation entirely
 - **MCP server:** native [Model Context Protocol](https://modelcontextprotocol.io/) support with 19 tools so AI agents (VS Code Copilot, Claude, Cursor, Windsurf, etc.) can shop on your behalf
 - **Advertise requests:** can't find what you need? Publicly post a request and let stores try to find it for you
+- **Support & reviews:** if something goes wrong, create support tickets and handle the entire process from the CLI — write product and store reviews too
 - **Open marketplace:** anyone can start selling on CLISHOP by deploying a [Dark Store](https://github.com/DavooxBv2/CLISHOP-DARKSTORE) — no website required
 
 ---
