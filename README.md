@@ -70,9 +70,38 @@ clishop setup
 
 The setup wizard walks you through creating an account, adding an address, and linking a payment method. After that:
 
+```
+$ clishop search "wireless headphones"
+
+  🔍 Search results for "wireless headphones"
+
+  1  Sony WH-1000XM5                           $278.00
+     SUPERSTORE · ★ 8.1 · Free shipping · 3-5 days
+
+  2  JBL Tune 770NC Wireless                    $79.95
+     EveryMarket · ★ 7.9 · $5.99 shipping · 5-8 days
+
+  ℹ️  Get more details: clishop info 1
+      Or buy directly: clishop buy 1
+```
+
+```
+$ clishop info 1
+
+  Sony WH-1000XM5
+  ─────────────────────────────────────
+  Price:       $278.00
+  Store:       SUPERSTORE (★ 8.1)
+  Shipping:    Free · 3-5 business days
+  Returns:     30-day free returns
+  In stock:    Yes
+
+  Industry-leading noise cancellation with
+  Auto NC Optimizer. 30-hour battery life.
+  Multipoint connection for two devices.
+```
+
 ```bash
-clishop search "wireless headphones"
-clishop info 1
 clishop buy 1
 ```
 
