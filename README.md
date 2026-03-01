@@ -81,8 +81,6 @@ $ clishop search "wireless headphones"
   2  JBL Tune 770NC Wireless                    $79.95
      EveryMarket · ★ 7.9 · $5.99 shipping · 5-8 days
 
-  ℹ️  Get more details: clishop info 1
-      Or buy directly: clishop buy 1
 ```
 
 ```
