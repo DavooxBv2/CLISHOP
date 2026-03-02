@@ -1,6 +1,6 @@
 {
   "name": "clishop",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "mcpName": "io.github.StefDCL/clishop",
   "description": "CLISHOP — Order anything from your terminal",
   "main": "dist/index.js",
