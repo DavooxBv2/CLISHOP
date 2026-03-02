@@ -3,7 +3,7 @@ import chalk from "chalk";
 import ora from "ora";
 import inquirer from "inquirer";
 import { getApiClient, handleApiError } from "../api.js";
-import { getActiveAgent, getConfig, SearchResultCache } from "../config.js";
+import { getActiveAgent, getConfig, SearchResultCache, updateAgent } from "../config.js";
 
 export interface Product {
   id: string;
@@ -636,22 +636,26 @@ export function registerSearchCommands(program: Command): void {
         // Uses the active agent's default address so searches target the right region
         if (!shipToCountry && !shipToCity && !shipToPostalCode && !opts.shipTo) {
           const agent = getActiveAgent();
-          if (agent.defaultAddressId) {
-            try {
-              spinner.text = `Resolving default address...`;
-              const addrRes = await api.get("/addresses");
-              const addresses = addrRes.data.addresses || [];
-              const defaultAddr = addresses.find((a: any) => a.id === agent.defaultAddressId);
-              if (defaultAddr) {
-                shipToCountry = defaultAddr.country;
-                shipToCity = defaultAddr.city;
-                shipToPostalCode = defaultAddr.postalCode;
-                shipToRegion = defaultAddr.region || undefined;
-                spinner.text = `Searching for "${query}" (delivering to: ${[shipToCity, shipToCountry].filter(Boolean).join(", ")})...`;
+          try {
+            spinner.text = `Resolving default address...`;
+            const addrRes = await api.get("/addresses");
+            const addresses = addrRes.data.addresses || [];
+            // Prefer the agent's default address, fall back to the first available address
+            const resolved = (agent.defaultAddressId && addresses.find((a: any) => a.id === agent.defaultAddressId))
+              || addresses[0];
+            if (resolved) {
+              shipToCountry = resolved.country;
+              shipToCity = resolved.city;
+              shipToPostalCode = resolved.postalCode;
+              shipToRegion = resolved.region || undefined;
+              // Auto-set defaultAddressId if it was missing so future lookups are instant
+              if (!agent.defaultAddressId) {
+                updateAgent(agent.name, { defaultAddressId: resolved.id });
               }
-            } catch {
-              // Default address lookup failed — continue without it
+              spinner.text = `Searching for "${query}" (delivering to: ${[shipToCity, shipToCountry].filter(Boolean).join(", ")})...`;
             }
+          } catch {
+            // Address lookup failed — continue without it
           }
         }
 
