@@ -60,7 +60,7 @@ function safeCall<T>(
 const server = new McpServer(
   {
     name: "clishop",
-    version: "1.2.0",
+    version: "1.2.1",
   },
   {
     capabilities: {
@@ -110,6 +110,31 @@ server.registerTool("search_products", {
 }, async (args) => {
   return safeCall(async () => {
     const api = getApiClient();
+
+    // Auto-resolve country from default address if not provided (same as CLI)
+    let country = args.country;
+    if (!country) {
+      const agent = getActiveAgent();
+      try {
+        const addrRes = await api.get("/addresses", { params: { agent: agent.name } });
+        const addresses = addrRes.data.addresses || [];
+        const resolved = (agent.defaultAddressId && addresses.find((a: any) => a.id === agent.defaultAddressId))
+          || addresses[0];
+        if (resolved) {
+          country = resolved.country;
+          if (!agent.defaultAddressId) {
+            const { updateAgent } = await import("./config.js");
+            updateAgent(agent.name, { defaultAddressId: resolved.id });
+          }
+        }
+      } catch {
+        // Address lookup failed — continue without it
+      }
+    }
+    if (!country) {
+      throw new Error("No delivery country available. Add a shipping address first ('clishop address add') or pass the 'country' parameter (e.g. 'US', 'NL', 'BE').");
+    }
+
     const res = await api.get("/products/search", {
       params: {
         q: args.query,
@@ -119,7 +144,7 @@ server.registerTool("search_products", {
         minPrice: args.minPrice,
         maxPrice: args.maxPrice,
         freeShipping: args.freeShipping || undefined,
-        country: args.country,
+        country,
         maxDeliveryDays: args.maxDeliveryDays,
         inStock: args.inStock || undefined,
         freeReturns: args.freeReturns || undefined,
