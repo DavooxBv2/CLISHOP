@@ -60,7 +60,7 @@ function safeCall<T>(
 const server = new McpServer(
   {
     name: "clishop",
-    version: "0.3.1",
+    version: "1.1.1",
   },
   {
     capabilities: {
@@ -410,10 +410,13 @@ server.registerTool("add_address", {
       instructions: args.instructions || undefined,
     });
 
-    // Optionally set as default
-    if (args.setDefault && res.data.address?.id) {
-      const { updateAgent } = await import("./config.js");
-      updateAgent(agent.name, { defaultAddressId: res.data.address.id });
+    // Auto-set as default if it's the only address, or if explicitly requested
+    if (res.data.address?.id) {
+      const shouldSetDefault = args.setDefault || !agent.defaultAddressId;
+      if (shouldSetDefault) {
+        const { updateAgent } = await import("./config.js");
+        updateAgent(agent.name, { defaultAddressId: res.data.address.id });
+      }
     }
 
     return res.data;
@@ -438,8 +441,23 @@ server.registerTool("remove_address", {
   },
 }, async (args) => {
   return safeCall(async () => {
+    const agent = getActiveAgent();
     const api = getApiClient();
     await api.delete(`/addresses/${args.addressId}`);
+
+    // Clear default if this was it
+    const { updateAgent } = await import("./config.js");
+    if (agent.defaultAddressId === args.addressId) {
+      updateAgent(agent.name, { defaultAddressId: undefined });
+    }
+
+    // If only one address remains, auto-set it as default
+    const remaining = await api.get("/addresses", { params: { agent: agent.name } });
+    const addresses = remaining.data.addresses || [];
+    if (addresses.length === 1) {
+      updateAgent(agent.name, { defaultAddressId: addresses[0].id });
+    }
+
     return { success: true, message: "Address removed." };
   });
 });
@@ -782,6 +800,658 @@ server.registerTool("submit_feedback", {
       actualBehavior: args.actualBehavior || undefined,
       expectedBehavior: args.expectedBehavior || undefined,
     });
+    return res.data;
+  });
+});
+
+// =====================================================================
+// TOOL: add_product_review
+// =====================================================================
+server.registerTool("add_product_review", {
+  title: "Add Product Review",
+  description: "Write a review for a product. Rating is on a 1-10 scale.",
+  inputSchema: {
+    productId: z.string().describe("Product ID to review"),
+    rating: z.number().min(1).max(10).describe("Rating from 1 (terrible) to 10 (perfect)"),
+    title: z.string().describe("Review title"),
+    body: z.string().describe("Review body text"),
+    orderId: z.string().optional().describe("Associated order ID (optional)"),
+  },
+  annotations: {
+    title: "Add Product Review",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    const res = await api.post(`/products/${args.productId}/reviews`, {
+      rating: args.rating,
+      title: args.title,
+      body: args.body,
+      orderId: args.orderId || undefined,
+    });
+    return res.data;
+  });
+});
+
+// =====================================================================
+// TOOL: add_store_review
+// =====================================================================
+server.registerTool("add_store_review", {
+  title: "Add Store Review",
+  description: "Write a review for a store. Rating is on a 1-10 scale.",
+  inputSchema: {
+    storeId: z.string().describe("Store ID to review"),
+    rating: z.number().min(1).max(10).describe("Rating from 1 (terrible) to 10 (perfect)"),
+    title: z.string().describe("Review title"),
+    body: z.string().describe("Review body text"),
+    orderId: z.string().optional().describe("Associated order ID (optional)"),
+  },
+  annotations: {
+    title: "Add Store Review",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    const res = await api.post(`/stores/${args.storeId}/reviews`, {
+      rating: args.rating,
+      title: args.title,
+      body: args.body,
+      orderId: args.orderId || undefined,
+    });
+    return res.data;
+  });
+});
+
+// =====================================================================
+// TOOL: list_reviews
+// =====================================================================
+server.registerTool("list_reviews", {
+  title: "List My Reviews",
+  description: "List all product and store reviews you have written.",
+  inputSchema: {},
+  annotations: {
+    title: "List My Reviews",
+    readOnlyHint: true,
+    openWorldHint: false,
+  },
+}, async () => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    const res = await api.get("/reviews/mine");
+    return res.data;
+  });
+});
+
+// =====================================================================
+// TOOL: get_product_rating
+// =====================================================================
+server.registerTool("get_product_rating", {
+  title: "Get Product Rating",
+  description: "View rating details for a product including review count, Bayesian average, and effective cap.",
+  inputSchema: {
+    productId: z.string().describe("Product ID"),
+  },
+  annotations: {
+    title: "Get Product Rating",
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    const res = await api.get(`/products/${args.productId}/rating`);
+    return res.data;
+  });
+});
+
+// =====================================================================
+// TOOL: get_store_rating
+// =====================================================================
+server.registerTool("get_store_rating", {
+  title: "Get Store Rating",
+  description: "View rating details for a store including review count, Bayesian average, and effective cap.",
+  inputSchema: {
+    storeId: z.string().describe("Store ID"),
+  },
+  annotations: {
+    title: "Get Store Rating",
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    const res = await api.get(`/stores/${args.storeId}/rating`);
+    return res.data;
+  });
+});
+
+// =====================================================================
+// TOOL: delete_review
+// =====================================================================
+server.registerTool("delete_review", {
+  title: "Delete Review",
+  description: "Delete one of your reviews (product or store).",
+  inputSchema: {
+    reviewId: z.string().describe("Review ID to delete"),
+    isStoreReview: z.boolean().optional().describe("Set to true if this is a store review (default: product review)"),
+  },
+  annotations: {
+    title: "Delete Review",
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    const endpoint = args.isStoreReview
+      ? `/stores/reviews/${args.reviewId}`
+      : `/products/reviews/${args.reviewId}`;
+    await api.delete(endpoint);
+    return { success: true, message: "Review deleted." };
+  });
+});
+
+// =====================================================================
+// TOOL: list_advertise_requests
+// =====================================================================
+server.registerTool("list_advertise_requests", {
+  title: "List Advertise Requests",
+  description: "List your advertised requests where vendors can bid to fulfill them.",
+  inputSchema: {
+    status: z.enum(["open", "closed", "accepted", "cancelled", "expired"]).optional().describe("Filter by status"),
+    page: z.number().optional().describe("Page number"),
+  },
+  annotations: {
+    title: "List Advertise Requests",
+    readOnlyHint: true,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    const res = await api.get("/advertise", {
+      params: { status: args.status, page: args.page },
+    });
+    return res.data;
+  });
+});
+
+// =====================================================================
+// TOOL: get_advertise_request
+// =====================================================================
+server.registerTool("get_advertise_request", {
+  title: "Get Advertise Request",
+  description: "View an advertised request and its vendor bids.",
+  inputSchema: {
+    advertiseId: z.string().describe("Advertise request ID"),
+  },
+  annotations: {
+    title: "Get Advertise Request",
+    readOnlyHint: true,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    const res = await api.get(`/advertise/${args.advertiseId}`);
+    return res.data;
+  });
+});
+
+// =====================================================================
+// TOOL: accept_advertise_bid
+// =====================================================================
+server.registerTool("accept_advertise_bid", {
+  title: "Accept Advertise Bid",
+  description: "Accept a vendor's bid on your advertised request. All other bids will be automatically rejected.",
+  inputSchema: {
+    advertiseId: z.string().describe("Advertise request ID"),
+    bidId: z.string().describe("Bid ID to accept"),
+  },
+  annotations: {
+    title: "Accept Advertise Bid",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    const res = await api.post(`/advertise/${args.advertiseId}/bids/${args.bidId}/accept`);
+    return res.data;
+  });
+});
+
+// =====================================================================
+// TOOL: reject_advertise_bid
+// =====================================================================
+server.registerTool("reject_advertise_bid", {
+  title: "Reject Advertise Bid",
+  description: "Reject a vendor's bid on your advertised request.",
+  inputSchema: {
+    advertiseId: z.string().describe("Advertise request ID"),
+    bidId: z.string().describe("Bid ID to reject"),
+  },
+  annotations: {
+    title: "Reject Advertise Bid",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    const res = await api.post(`/advertise/${args.advertiseId}/bids/${args.bidId}/reject`);
+    return res.data;
+  });
+});
+
+// =====================================================================
+// TOOL: cancel_advertise_request
+// =====================================================================
+server.registerTool("cancel_advertise_request", {
+  title: "Cancel Advertise Request",
+  description: "Cancel an open advertised request.",
+  inputSchema: {
+    advertiseId: z.string().describe("Advertise request ID to cancel"),
+  },
+  annotations: {
+    title: "Cancel Advertise Request",
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    const res = await api.post(`/advertise/${args.advertiseId}/cancel`);
+    return res.data;
+  });
+});
+
+// =====================================================================
+// TOOL: get_support_ticket
+// =====================================================================
+server.registerTool("get_support_ticket", {
+  title: "Get Support Ticket",
+  description: "View a support ticket and its full message history.",
+  inputSchema: {
+    ticketId: z.string().describe("Support ticket ID"),
+  },
+  annotations: {
+    title: "Get Support Ticket",
+    readOnlyHint: true,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    const res = await api.get(`/support/${args.ticketId}`);
+    return res.data;
+  });
+});
+
+// =====================================================================
+// TOOL: reply_to_support_ticket
+// =====================================================================
+server.registerTool("reply_to_support_ticket", {
+  title: "Reply to Support Ticket",
+  description: "Send a reply message to an existing support ticket.",
+  inputSchema: {
+    ticketId: z.string().describe("Support ticket ID"),
+    message: z.string().describe("Reply message text"),
+  },
+  annotations: {
+    title: "Reply to Support Ticket",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    const res = await api.post(`/support/${args.ticketId}/reply`, {
+      message: args.message,
+    });
+    return res.data;
+  });
+});
+
+// =====================================================================
+// TOOL: close_support_ticket
+// =====================================================================
+server.registerTool("close_support_ticket", {
+  title: "Close Support Ticket",
+  description: "Close a resolved support ticket.",
+  inputSchema: {
+    ticketId: z.string().describe("Support ticket ID to close"),
+  },
+  annotations: {
+    title: "Close Support Ticket",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    const res = await api.patch(`/support/${args.ticketId}/status`, { status: "closed" });
+    return res.data;
+  });
+});
+
+// =====================================================================
+// TOOL: create_agent
+// =====================================================================
+server.registerTool("create_agent", {
+  title: "Create Agent",
+  description: "Create a new agent (safety profile) with spending limits and category restrictions.",
+  inputSchema: {
+    name: z.string().describe("Agent name (e.g. 'work', 'personal', 'gifts')"),
+    maxOrderAmount: z.number().optional().describe("Max order amount in dollars (e.g. 100)"),
+    requireConfirmation: z.boolean().optional().describe("Require confirmation before ordering (default: true)"),
+    allowedCategories: z.array(z.string()).optional().describe("Only allow these categories"),
+    blockedCategories: z.array(z.string()).optional().describe("Block these categories"),
+  },
+  annotations: {
+    title: "Create Agent",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const { createAgent } = await import("./config.js");
+    const agent = createAgent(args.name, {
+      maxOrderAmount: args.maxOrderAmount,
+      requireConfirmation: args.requireConfirmation ?? true,
+      allowedCategories: args.allowedCategories,
+      blockedCategories: args.blockedCategories,
+    });
+    return { success: true, agent };
+  });
+});
+
+// =====================================================================
+// TOOL: switch_agent
+// =====================================================================
+server.registerTool("switch_agent", {
+  title: "Switch Active Agent",
+  description: "Switch which agent (safety profile) is active. The active agent controls spending limits and defaults.",
+  inputSchema: {
+    name: z.string().describe("Agent name to switch to"),
+  },
+  annotations: {
+    title: "Switch Active Agent",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const { setActiveAgent } = await import("./config.js");
+    setActiveAgent(args.name);
+    return { success: true, activeAgent: args.name };
+  });
+});
+
+// =====================================================================
+// TOOL: get_agent
+// =====================================================================
+server.registerTool("get_agent", {
+  title: "Get Agent Details",
+  description: "Show details of a specific agent (safety profile) including limits, categories, and defaults.",
+  inputSchema: {
+    name: z.string().optional().describe("Agent name (defaults to active agent)"),
+  },
+  annotations: {
+    title: "Get Agent Details",
+    readOnlyHint: true,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const { getAgent, getConfig } = await import("./config.js");
+    const agentName = args.name || getConfig().get("activeAgent");
+    const agent = getAgent(agentName);
+    if (!agent) throw new Error(`Agent "${agentName}" not found.`);
+    return { agent, isActive: agentName === getConfig().get("activeAgent") };
+  });
+});
+
+// =====================================================================
+// TOOL: update_agent
+// =====================================================================
+server.registerTool("update_agent", {
+  title: "Update Agent",
+  description: "Update an agent's settings (spending limits, category restrictions, confirmation preference).",
+  inputSchema: {
+    name: z.string().optional().describe("Agent name (defaults to active agent)"),
+    maxOrderAmount: z.number().optional().describe("Max order amount in dollars"),
+    requireConfirmation: z.boolean().optional().describe("Require confirmation before ordering"),
+    allowedCategories: z.array(z.string()).optional().describe("Only allow these categories (empty = all)"),
+    blockedCategories: z.array(z.string()).optional().describe("Block these categories (empty = none)"),
+    defaultAddressId: z.string().optional().describe("Default shipping address ID"),
+    defaultPaymentMethodId: z.string().optional().describe("Default payment method ID"),
+  },
+  annotations: {
+    title: "Update Agent",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const { updateAgent, getAgent, getConfig } = await import("./config.js");
+    const agentName = args.name || getConfig().get("activeAgent");
+    const existing = getAgent(agentName);
+    if (!existing) throw new Error(`Agent "${agentName}" not found.`);
+
+    const updates: Record<string, any> = {};
+    if (args.maxOrderAmount !== undefined) updates.maxOrderAmount = args.maxOrderAmount;
+    if (args.requireConfirmation !== undefined) updates.requireConfirmation = args.requireConfirmation;
+    if (args.allowedCategories !== undefined) updates.allowedCategories = args.allowedCategories;
+    if (args.blockedCategories !== undefined) updates.blockedCategories = args.blockedCategories;
+    if (args.defaultAddressId !== undefined) updates.defaultAddressId = args.defaultAddressId;
+    if (args.defaultPaymentMethodId !== undefined) updates.defaultPaymentMethodId = args.defaultPaymentMethodId;
+
+    const updated = updateAgent(agentName, updates);
+    return { success: true, agent: updated };
+  });
+});
+
+// =====================================================================
+// TOOL: get_spending_limit
+// =====================================================================
+server.registerTool("get_spending_limit", {
+  title: "Get Spending Limit",
+  description: "View the current monthly spending limit.",
+  inputSchema: {},
+  annotations: {
+    title: "Get Spending Limit",
+    readOnlyHint: true,
+    openWorldHint: false,
+  },
+}, async () => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    const res = await api.get("/spending-limit");
+    return res.data;
+  });
+});
+
+// =====================================================================
+// TOOL: set_spending_limit
+// =====================================================================
+server.registerTool("set_spending_limit", {
+  title: "Set Spending Limit",
+  description: "Change your monthly spending limit. May require email confirmation for security.",
+  inputSchema: {
+    amountInDollars: z.number().min(1).describe("New monthly spending limit in dollars (minimum $1)"),
+  },
+  annotations: {
+    title: "Set Spending Limit",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    const limitInCents = Math.round(args.amountInDollars * 100);
+    const res = await api.patch("/spending-limit", { limitInCents });
+    return res.data;
+  });
+});
+
+// =====================================================================
+// TOOL: remove_payment_method
+// =====================================================================
+server.registerTool("remove_payment_method", {
+  title: "Remove Payment Method",
+  description: "Remove a saved payment method by its ID.",
+  inputSchema: {
+    paymentMethodId: z.string().describe("Payment method ID to remove"),
+  },
+  annotations: {
+    title: "Remove Payment Method",
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    await api.delete(`/payment-methods/${args.paymentMethodId}`);
+
+    // Clear default if this was the default
+    const { getActiveAgent, updateAgent } = await import("./config.js");
+    const agent = getActiveAgent();
+    if (agent.defaultPaymentMethodId === args.paymentMethodId) {
+      updateAgent(agent.name, { defaultPaymentMethodId: undefined });
+    }
+
+    return { success: true, message: "Payment method removed." };
+  });
+});
+
+// =====================================================================
+// TOOL: set_default_payment_method
+// =====================================================================
+server.registerTool("set_default_payment_method", {
+  title: "Set Default Payment Method",
+  description: "Set the default payment method for the active agent.",
+  inputSchema: {
+    paymentMethodId: z.string().describe("Payment method ID to set as default"),
+  },
+  annotations: {
+    title: "Set Default Payment Method",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const { getActiveAgent, updateAgent } = await import("./config.js");
+    const agent = getActiveAgent();
+    updateAgent(agent.name, { defaultPaymentMethodId: args.paymentMethodId });
+    return { success: true, message: `Default payment for agent "${agent.name}" set to ${args.paymentMethodId}.` };
+  });
+});
+
+// =====================================================================
+// TOOL: set_default_address
+// =====================================================================
+server.registerTool("set_default_address", {
+  title: "Set Default Address",
+  description: "Set the default shipping address for the active agent.",
+  inputSchema: {
+    addressId: z.string().describe("Address ID to set as default"),
+  },
+  annotations: {
+    title: "Set Default Address",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const { getActiveAgent, updateAgent } = await import("./config.js");
+    const agent = getActiveAgent();
+    updateAgent(agent.name, { defaultAddressId: args.addressId });
+    return { success: true, message: `Default address for agent "${agent.name}" set to ${args.addressId}.` };
+  });
+});
+
+// =====================================================================
+// TOOL: list_feedback
+// =====================================================================
+server.registerTool("list_feedback", {
+  title: "List Feedback",
+  description: "List your submitted bug reports and suggestions.",
+  inputSchema: {
+    type: z.enum(["bug", "suggestion"]).optional().describe("Filter by feedback type"),
+    status: z.string().optional().describe("Filter by status (open, acknowledged, in_progress, fixed, wont_fix, closed)"),
+  },
+  annotations: {
+    title: "List Feedback",
+    readOnlyHint: true,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    const res = await api.get("/feedback", {
+      params: {
+        ...(args.type ? { type: args.type } : {}),
+        ...(args.status ? { status: args.status } : {}),
+      },
+    });
+    return res.data;
+  });
+});
+
+// =====================================================================
+// TOOL: get_feedback
+// =====================================================================
+server.registerTool("get_feedback", {
+  title: "Get Feedback Details",
+  description: "View details of a specific bug report or suggestion by ID.",
+  inputSchema: {
+    feedbackId: z.string().describe("Feedback ID"),
+  },
+  annotations: {
+    title: "Get Feedback Details",
+    readOnlyHint: true,
+    openWorldHint: false,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const api = getApiClient();
+    const res = await api.get(`/feedback/${args.feedbackId}`);
     return res.data;
   });
 });

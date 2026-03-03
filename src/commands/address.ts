@@ -214,7 +214,8 @@ export function registerAddressCommands(program: Command): void {
           instructions: instructionsInput || undefined,
         });
 
-        if (setDefault) {
+        // Auto-set as default if it's the only/first address, or if explicitly requested
+        if (setDefault || !agent.defaultAddressId) {
           updateAgent(agent.name, { defaultAddressId: res.data.address.id });
         }
 
@@ -246,10 +247,17 @@ export function registerAddressCommands(program: Command): void {
         await api.delete(`/addresses/${id}`);
         spinner.succeed(chalk.green("Address removed."));
 
-        // Clear default if it was this one
+        // Clear default if it was this one, then auto-set if only one remains
         const agent = getActiveAgent();
         if (agent.defaultAddressId === id) {
           updateAgent(agent.name, { defaultAddressId: undefined });
+        }
+
+        // If only one address remains, auto-set it as default
+        const remainingRes = await api.get("/addresses", { params: { agent: agent.name } });
+        const remaining = remainingRes.data.addresses || [];
+        if (remaining.length === 1) {
+          updateAgent(agent.name, { defaultAddressId: remaining[0].id });
         }
       } catch (error) {
         handleApiError(error);
