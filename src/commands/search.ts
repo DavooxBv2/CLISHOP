@@ -34,7 +34,6 @@ export interface Product {
   backorder: boolean;
   freeReturns: boolean;
   returnWindowDays?: number;
-  checkoutMode: string;
 }
 
 export interface SearchResult {
@@ -336,7 +335,6 @@ function renderProductInfo(
   // Checkout
   if (info.checkout && typeof info.checkout === "object") {
     const parts: string[] = [];
-    if (info.checkout.mode) parts.push(info.checkout.mode);
     if (info.checkout.note) parts.push(info.checkout.note);
     if (parts.length > 0) {
       console.log(`      ${chalk.bold("Checkout:")} ${parts.join(" — ")}`);
@@ -560,7 +558,7 @@ export function registerSearchCommands(program: Command): void {
     .option("--vendor <vendor>", "Filter by vendor name (alias for --store)")
     .option("--trusted-only", "Only show products from verified stores")
     .option("--min-store-rating <rating>", "Minimum store rating (0-5)", parseFloat)
-    .option("--checkout-mode <mode>", "Checkout mode: instant, handoff")
+
 
     // Rating / sorting / pagination
     .option("--min-rating <rating>", "Minimum product rating (1-5)", parseFloat)
@@ -725,7 +723,6 @@ export function registerSearchCommands(program: Command): void {
           vendor: opts.vendor,
           trustedOnly: opts.trustedOnly || undefined,
           minStoreRating: opts.minStoreRating,
-          checkoutMode: opts.checkoutMode,
           // Rating / sorting / pagination
           minRating: opts.minRating,
           sort: opts.sort === "total-cost" ? "price" : opts.sort, // backend doesn't know total-cost yet
@@ -1286,10 +1283,6 @@ export function registerSearchCommands(program: Command): void {
         if (p.returnWindowDays) returnParts.push(`${p.returnWindowDays}-day return window`);
         if (returnParts.length) console.log(`  Returns:  ${returnParts.join(" · ")}`);
 
-        // Checkout mode
-        if (p.checkoutMode && p.checkoutMode !== "instant") {
-          console.log(`  Checkout: ${chalk.yellow(p.checkoutMode)}`);
-        }
 
         console.log();
         console.log(`  ${p.description}`);

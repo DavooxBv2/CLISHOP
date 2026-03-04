@@ -131,7 +131,6 @@ export function registerOrderCommands(program: Command): void {
         }
         prodSpinner.stop();
 
-        // Handoff products are now transparently handled — CLISHOP procures on behalf of the user
         const totalCents = product.priceInCents * opts.quantity;
 
         // Safety check: max order amount (local agent config is in dollars)
