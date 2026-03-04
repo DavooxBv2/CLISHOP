@@ -60,7 +60,7 @@ function safeCall<T>(
 const server = new McpServer(
   {
     name: "clishop",
-    version: "1.2.2",
+    version: "1.2.3",
   },
   {
     capabilities: {
@@ -116,7 +116,7 @@ server.registerTool("search_products", {
     if (!country) {
       const agent = getActiveAgent();
       try {
-        const addrRes = await api.get("/addresses", { params: { agent: agent.name } });
+        const addrRes = await api.get("/addresses");
         const addresses = addrRes.data.addresses || [];
         const resolved = (agent.defaultAddressId && addresses.find((a: any) => a.id === agent.defaultAddressId))
           || addresses[0];
