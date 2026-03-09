@@ -33,7 +33,7 @@ CLISHOP is an open-source CLI that lets AI agents and humans search for products
 
 - One query searches every store in the network. Results are filtered to what actually ships to your address.
 - Set spending caps per order, require email confirmation before anything ships, or let it go through automatically — your call.
-- Ships as a native [MCP server](https://modelcontextprotocol.io/) with 19 tools. Works with VS Code Copilot, Claude, Cursor, Windsurf, and anything else that speaks MCP.
+- Ships as a native [MCP server](https://modelcontextprotocol.io/) with 44 tools. Works with VS Code Copilot, Claude, Cursor, Windsurf, and anything else that speaks MCP.
 - Can't find what you need? Post an advertise request and let vendors compete to fulfill it.
 - Support tickets, product reviews, store reviews — all from the terminal.
 - Anyone can sell on CLISHOP by deploying a [Dark Store](https://github.com/DavooxBv2/CLISHOP-DARKSTORE). No website needed.
@@ -150,7 +150,7 @@ npm run lint                         # Type-check
 
 ## MCP Server
 
-CLISHOP ships as a native MCP server with 19 tools. Any MCP-compatible client gets shopping capabilities out of the box.
+CLISHOP ships as a native MCP server with 44 tools. Any MCP-compatible client gets shopping capabilities out of the box.
 
 ```bash
 clishop-mcp              # If installed globally
