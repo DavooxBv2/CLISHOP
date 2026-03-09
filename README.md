@@ -31,12 +31,12 @@ CLISHOP is an open-source CLI that lets AI agents and humans search for products
 
 ## Highlights
 
-- **Multi-store search:** one query searches every store in the network and only returns items that ship to your address
-- **Safety thresholds:** cap how much can be spent per order, require email confirmation before anything ships, or skip confirmation entirely
-- **MCP server:** native [Model Context Protocol](https://modelcontextprotocol.io/) support with 19 tools so AI agents (VS Code Copilot, Claude, Cursor, Windsurf, etc.) can shop on your behalf
-- **Advertise requests:** can't find what you need? Publicly post a request and let stores try to find it for you
-- **Support & reviews:** if something goes wrong, create support tickets and handle the entire process from the CLI — write product and store reviews too
-- **Open marketplace:** anyone can start selling on CLISHOP by deploying a [Dark Store](https://github.com/DavooxBv2/CLISHOP-DARKSTORE) — no website required
+- One query searches every store in the network. Results are filtered to what actually ships to your address.
+- Set spending caps per order, require email confirmation before anything ships, or let it go through automatically — your call.
+- Ships as a native [MCP server](https://modelcontextprotocol.io/) with 19 tools. Works with VS Code Copilot, Claude, Cursor, Windsurf, and anything else that speaks MCP.
+- Can't find what you need? Post an advertise request and let vendors compete to fulfill it.
+- Support tickets, product reviews, store reviews — all from the terminal.
+- Anyone can sell on CLISHOP by deploying a [Dark Store](https://github.com/DavooxBv2/CLISHOP-DARKSTORE). No website needed.
 
 ---
 
@@ -132,7 +132,7 @@ clishop buy 1
 
 ## Sell on CLISHOP
 
-Want to sell your own products? Use the [Dark Store](https://github.com/DavooxBv2/CLISHOP-DARKSTORE) template to create your own store — no website needed. Configure your catalog, shipping, and pricing in a few YAML files, deploy to Vercel, and start receiving orders.
+You can run your own store with the [Dark Store](https://github.com/DavooxBv2/CLISHOP-DARKSTORE) template. Define your catalog, shipping rules, and pricing in YAML, deploy to Vercel, and you're live. No website needed.
 
 ---
 
