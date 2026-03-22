@@ -16,13 +16,14 @@ import { registerSetupCommand, runSetupWizard } from "./commands/setup.js";
 import { registerAdvertiseCommands } from "./commands/advertise.js";
 import { registerSupportCommands } from "./commands/support.js";
 import { registerFeedbackCommands } from "./commands/feedback.js";
+import { registerDoctorCommand } from "./commands/doctor.js";
 import { getConfig } from "./config.js";
 
 const program = new Command();
 
 program
   .name("clishop")
-  .version("1.2.3")
+  .version("1.3.0")
   .description(
     chalk.bold("CLISHOP") +
       " — Order anything from your terminal.\n\n" +
@@ -58,6 +59,7 @@ registerSetupCommand(program);
 registerAdvertiseCommands(program);
 registerSupportCommands(program);
 registerFeedbackCommands(program);
+registerDoctorCommand(program);
 
 // Main entry with first-run detection
 async function main() {
