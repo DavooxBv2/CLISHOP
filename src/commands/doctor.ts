@@ -30,11 +30,9 @@ export function registerDoctorCommand(program: Command): void {
       checks.push({
         name: "Auth backend",
         ok: true,
-        detail: backend === "env"
-          ? "Using CLISHOP_TOKEN environment variable"
-          : backend === "keytar"
-            ? "Using OS keychain"
-            : "Using file store (~/.config/clishop/auth.json)",
+        detail: backend === "keytar"
+          ? "Using OS keychain"
+          : "Using file store (~/.config/clishop/auth.json)",
       });
 
       // 3. file store writable

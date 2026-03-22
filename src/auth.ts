@@ -29,7 +29,7 @@ function getKeytar(): typeof import("keytar") | null {
 }
 
 // ---------------------------------------------------------------------------
-// Backend selection: env → keytar → file
+// Backend selection: keytar → file
 // ---------------------------------------------------------------------------
 
 const SERVICE_NAME = "clishop";
@@ -37,16 +37,11 @@ const ACCOUNT_TOKEN = "auth-token";
 const ACCOUNT_REFRESH = "refresh-token";
 const ACCOUNT_USER = "user-info";
 
-export type AuthBackend = "keytar" | "file" | "env";
+export type AuthBackend = "keytar" | "file";
 let _activeBackend: AuthBackend | null = null;
 
 export function resolveBackend(): AuthBackend {
   if (_activeBackend) return _activeBackend;
-
-  if (process.env.CLISHOP_TOKEN) {
-    _activeBackend = "env";
-    return _activeBackend;
-  }
 
   const kt = getKeytar();
   if (kt) {
@@ -76,7 +71,6 @@ export function isKeytarAvailable(): boolean {
 
 async function setPassword(account: string, value: string): Promise<void> {
   const backend = resolveBackend();
-  if (backend === "env") return; // env mode is read-only
   if (backend === "keytar") {
     return getKeytar()!.setPassword(SERVICE_NAME, account, value);
   }
@@ -85,9 +79,6 @@ async function setPassword(account: string, value: string): Promise<void> {
 
 async function getPassword(account: string): Promise<string | null> {
   const backend = resolveBackend();
-  if (backend === "env" && account === ACCOUNT_TOKEN) {
-    return process.env.CLISHOP_TOKEN!;
-  }
   if (backend === "keytar") {
     return getKeytar()!.getPassword(SERVICE_NAME, account);
   }
@@ -96,7 +87,6 @@ async function getPassword(account: string): Promise<string | null> {
 
 async function deletePassword(account: string): Promise<void> {
   const backend = resolveBackend();
-  if (backend === "env") return;
   if (backend === "keytar") {
     await getKeytar()!.deletePassword(SERVICE_NAME, account);
     return;
