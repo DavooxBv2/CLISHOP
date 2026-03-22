@@ -145,11 +145,6 @@ export async function runSetupWizard(): Promise<void> {
     console.log();
     console.log("  " + chalk.cyan.underline(webSetupUrl));
     console.log();
-    console.log(
-      chalk.dim("  Complete the setup there, then return here and run:")
-    );
-    console.log(chalk.dim("  ") + chalk.white("clishop login"));
-    console.log();
 
     const opened = await openBrowser(webSetupUrl);
     if (!opened) {
@@ -158,7 +153,99 @@ export async function runSetupWizard(): Promise<void> {
       );
     }
 
+    console.log(
+      chalk.dim("  Create your account and configure everything on the website.")
+    );
+    console.log(
+      chalk.dim("  When you're done, come back here to link your account to the CLI.")
+    );
+    console.log();
+
+    await inquirer.prompt([
+      {
+        type: "input",
+        name: "done",
+        message: "Press Enter after completing setup on the website...",
+      },
+    ]);
+
+    console.log();
+    console.log(chalk.bold("  Now let's link your account to the CLI."));
+    console.log();
+
+    const creds = await inquirer.prompt([
+      { type: "input", name: "email", message: "Email (same as on the website):" },
+      { type: "password", name: "password", message: "Password:", mask: "*" },
+    ]);
+
+    const spinner = ora("Logging in...").start();
+    try {
+      const user = await login(creds.email, creds.password);
+      spinner.succeed(chalk.green(`Logged in as ${chalk.bold(user.name)}.`));
+    } catch (error: any) {
+      spinner.fail(
+        chalk.red(
+          `Login failed: ${error?.response?.data?.message || error.message}`
+        )
+      );
+      console.log();
+      console.log(
+        chalk.dim("  You can try again with: ") + chalk.white("clishop login")
+      );
+      console.log();
+      config.set("setupCompleted", true);
+      return;
+    }
+
+    // Sync address and payment defaults from the backend
+    const syncSpinner = ora("Syncing your settings from the website...").start();
+    try {
+      const api = getApiClient();
+      const agent = getActiveAgent();
+      await ensureAgentOnBackend(agent.name);
+
+      const [addrRes, pmRes] = await Promise.all([
+        api.get("/addresses", { params: { agent: agent.name } }),
+        api.get("/payment-methods", { params: { agent: agent.name } }),
+      ]);
+
+      const addresses = addrRes.data.addresses || [];
+      const methods = pmRes.data.paymentMethods || [];
+
+      const synced: string[] = [];
+      if (addresses.length > 0) {
+        updateAgent(agent.name, { defaultAddressId: addresses[0].id });
+        synced.push(`address "${addresses[0].label || "Home"}"`);
+      }
+      if (methods.length > 0) {
+        updateAgent(agent.name, { defaultPaymentMethodId: methods[0].id });
+        synced.push(`payment "${methods[0].label}"`);
+      }
+
+      if (synced.length > 0) {
+        syncSpinner.succeed(chalk.green(`Synced: ${synced.join(", ")}`));
+      } else {
+        syncSpinner.info(
+          chalk.dim("No addresses or payment methods found yet. You can add them with:") +
+          "\n    " + chalk.white("clishop address add") +
+          "\n    " + chalk.white("clishop payment add")
+        );
+      }
+    } catch {
+      syncSpinner.warn(chalk.yellow("Could not sync settings — you can add them manually later."));
+    }
+
     config.set("setupCompleted", true);
+
+    console.log();
+    divider(chalk.green);
+    console.log();
+    console.log(chalk.bold.green("  ✓ You're all set!"));
+    console.log();
+    console.log(chalk.dim("  Try: ") + chalk.white("clishop search \"headphones\""));
+    console.log();
+    divider(chalk.green);
+    console.log();
     return;
   }
 
