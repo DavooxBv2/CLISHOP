@@ -42,7 +42,7 @@ CLISHOP is an open-source CLI that lets AI agents and humans search for products
 
 ## Install
 
-Requires **Node.js ≥ 18**.
+Requires **Node.js ≥ 18**. Works on macOS, Windows, and Linux/WSL.
 
 ```bash
 npm install -g clishop
@@ -50,7 +50,19 @@ npm install -g clishop
 
 This gives you two commands: `clishop` (the CLI) and `clishop-mcp` (the MCP server for AI agents).
 
-To install from source instead:
+### Linux / WSL
+
+CLISHOP works out of the box on Linux and WSL. On systems without a native keychain, tokens are stored in a local file (`~/.config/clishop/auth.json`) with restricted permissions.
+
+For native keychain support (optional):
+
+```bash
+sudo apt install libsecret-1-0
+```
+
+Run `clishop doctor` to check your system's compatibility.
+
+### From source
 
 ```bash
 git clone https://github.com/DavooxBv2/CLISHOP.git
@@ -104,6 +116,16 @@ clishop buy 1
 ```
 
 > **Tip:** use result numbers from a search anywhere — `clishop info 1 2 3` or `clishop buy 2`.
+
+### Diagnostics
+
+If something isn't working, run:
+
+```bash
+clishop doctor
+```
+
+This checks keychain availability, token storage, authentication status, and API connectivity.
 
 ---
 
