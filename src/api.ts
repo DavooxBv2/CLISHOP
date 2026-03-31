@@ -63,7 +63,7 @@ export function getApiClient(): AxiosInstance {
             // Refresh failed — user needs to login again
           }
         }
-        console.error(chalk.red("\n✗ Session expired. Please login again: clishop login\n"));
+        console.error(chalk.red("\n✗ Session expired. Please run: clishop setup\n"));
         process.exit(1);
       }
       throw error;

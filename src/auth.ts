@@ -104,32 +104,6 @@ export interface UserInfo {
   name: string;
 }
 
-interface AuthResponse {
-  token: string;
-  refreshToken?: string;
-  user: UserInfo;
-}
-
-function assertAuthResponse(data: unknown): AuthResponse {
-  const payload = data as Partial<AuthResponse>;
-  if (!payload || typeof payload !== "object") {
-    throw new Error("Invalid auth response from server.");
-  }
-  if (!payload.token || typeof payload.token !== "string") {
-    throw new Error("Auth response missing access token.");
-  }
-  if (payload.refreshToken !== undefined && typeof payload.refreshToken !== "string") {
-    throw new Error("Auth response has an invalid refresh token.");
-  }
-  if (!payload.user || typeof payload.user !== "object") {
-    throw new Error("Auth response missing user profile.");
-  }
-  if (!payload.user.id || !payload.user.email || !payload.user.name) {
-    throw new Error("Auth response user profile is incomplete.");
-  }
-  return payload as AuthResponse;
-}
-
 export async function storeToken(token: string): Promise<void> {
   await setPassword(ACCOUNT_TOKEN, token);
 }
@@ -174,40 +148,70 @@ export async function isLoggedIn(): Promise<boolean> {
 // Auth actions
 // ---------------------------------------------------------------------------
 
-export async function login(email: string, password: string): Promise<UserInfo> {
-  const baseUrl = getApiBaseUrl();
-
-  const res = await axios.post(`${baseUrl}/auth/login`, { email, password });
-  const { token, refreshToken, user } = assertAuthResponse(res.data);
-
-  await storeToken(token);
-  if (refreshToken) await storeRefreshToken(refreshToken);
-  await storeUserInfo(user);
-
-  return user;
+export async function storeAuthFromSetup(data: {
+  token: string;
+  refreshToken: string;
+  user: UserInfo;
+}): Promise<void> {
+  await storeToken(data.token);
+  await storeRefreshToken(data.refreshToken);
+  await storeUserInfo(data.user);
 }
 
-export async function register(
-  email: string,
-  password: string,
-  name: string,
-  monthlySpendingLimitInCents?: number
-): Promise<UserInfo> {
-  const baseUrl = getApiBaseUrl();
+// ---------------------------------------------------------------------------
+// Passwordless setup flow
+// ---------------------------------------------------------------------------
 
-  const body: Record<string, unknown> = { email, password, name };
-  if (monthlySpendingLimitInCents !== undefined) {
-    body.monthlySpendingLimitInCents = monthlySpendingLimitInCents;
+export interface SetupLinkResult {
+  setupUrl: string;
+  deviceCode: string;
+  userCode: string;
+  expiresIn: number;
+  pollInterval: number;
+}
+
+export interface DevicePollResult {
+  status: "pending" | "complete" | "expired";
+  token?: string;
+  refreshToken?: string;
+  user?: UserInfo;
+}
+
+/** Call POST /auth/setup-link to create an account + Stripe setup link. */
+export async function requestSetupLink(email: string, name: string): Promise<SetupLinkResult> {
+  const baseUrl = getApiBaseUrl();
+  const res = await axios.post(`${baseUrl}/auth/setup-link`, { email, name });
+  return res.data as SetupLinkResult;
+}
+
+/** Poll POST /auth/device/poll until setup is complete, expired, or times out. */
+export async function pollDeviceCode(
+  deviceCode: string,
+  { interval = 5000, timeout = 30 * 60 * 1000 } = {}
+): Promise<DevicePollResult> {
+  const baseUrl = getApiBaseUrl();
+  const deadline = Date.now() + timeout;
+
+  while (Date.now() < deadline) {
+    const res = await axios.post(`${baseUrl}/auth/device/poll`, { deviceCode });
+    const data = res.data as DevicePollResult;
+
+    if (data.status === "complete" && data.token && data.user) {
+      await storeToken(data.token);
+      if (data.refreshToken) await storeRefreshToken(data.refreshToken);
+      await storeUserInfo(data.user);
+      return data;
+    }
+
+    if (data.status === "expired") {
+      return data;
+    }
+
+    // Wait before next poll
+    await new Promise((resolve) => setTimeout(resolve, interval));
   }
 
-  const res = await axios.post(`${baseUrl}/auth/register`, body);
-  const { token, refreshToken, user } = assertAuthResponse(res.data);
-
-  await storeToken(token);
-  if (refreshToken) await storeRefreshToken(refreshToken);
-  await storeUserInfo(user);
-
-  return user;
+  return { status: "expired" };
 }
 
 export async function logout(): Promise<void> {

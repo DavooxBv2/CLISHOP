@@ -14,7 +14,7 @@ export function registerStatusCommand(program: Command): void {
       try {
         // Check login
         if (!(await isLoggedIn())) {
-          console.log(chalk.yellow("\nNot logged in. Run: clishop login\n"));
+          console.log(chalk.yellow("\nNot set up yet. Run: clishop setup\n"));
           return;
         }
 
@@ -107,7 +107,7 @@ export function registerStatusCommand(program: Command): void {
           console.log();
           console.log(chalk.bold(`     💳 Payment Methods (${agent.paymentMethods.length})`));
           if (agent.paymentMethods.length === 0) {
-            console.log(chalk.dim("        None — run: clishop payment add"));
+            console.log(chalk.dim("        None — run: clishop setup"));
           } else {
             for (const pm of agent.paymentMethods) {
               const isDefault = pm.id === agent.defaultPaymentMethodId;

@@ -53,7 +53,7 @@ export function registerDoctorCommand(program: Command): void {
       checks.push({
         name: "Authenticated",
         ok: !!token,
-        detail: token ? "Token present" : "Not logged in — run: clishop setup",
+        detail: token ? "Token present" : "Not set up — run: clishop setup",
       });
 
       // 5. API reachable

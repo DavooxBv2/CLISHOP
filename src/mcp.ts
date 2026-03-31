@@ -18,9 +18,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod/v4";
+import axios from "axios";
 import { getApiClient, handleApiError } from "./api.js";
 import { getActiveAgent, getConfig, getApiBaseUrl } from "./config.js";
-import { isLoggedIn, getUserInfo } from "./auth.js";
+import { isLoggedIn, getUserInfo, storeAuthFromSetup } from "./auth.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -68,6 +69,81 @@ const server = new McpServer(
     },
   },
 );
+
+// =====================================================================
+// TOOL: setup_payment
+// =====================================================================
+server.registerTool("setup_payment", {
+  title: "Setup Payment",
+  description:
+    "Onboard a new user by creating their account and generating a Stripe payment setup link. " +
+    "The user must open this link in their browser to link their payment method. " +
+    "This is the ONLY step requiring human interaction. " +
+    "After the user completes the link, call check_setup_status with the returned deviceCode to get auth tokens. " +
+    "The agent can then use add_address to set up shipping autonomously.",
+  inputSchema: {
+    email: z.string().email().describe("User's email address"),
+    name: z.string().describe("User's full name"),
+  },
+  annotations: {
+    title: "Setup Payment",
+    readOnlyHint: false,
+    openWorldHint: true,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const baseUrl = getApiBaseUrl();
+    const res = await axios.post(`${baseUrl}/auth/setup-link`, {
+      email: args.email,
+      name: args.name,
+    });
+    return {
+      ...res.data,
+      message:
+        "Ask the user to open setupUrl in their browser to link their payment method. " +
+        "Then call check_setup_status with the deviceCode to check when they're done.",
+    };
+  });
+});
+
+// =====================================================================
+// TOOL: check_setup_status
+// =====================================================================
+server.registerTool("check_setup_status", {
+  title: "Check Setup Status",
+  description:
+    "Poll the setup status after the user was given a payment link via setup_payment. " +
+    "Returns 'pending' while waiting, 'complete' with auth tokens when done, or 'expired' if timed out.",
+  inputSchema: {
+    deviceCode: z.string().describe("The deviceCode returned by setup_payment"),
+  },
+  annotations: {
+    title: "Check Setup Status",
+    readOnlyHint: true,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const baseUrl = getApiBaseUrl();
+    const res = await axios.post(`${baseUrl}/auth/device/poll`, {
+      deviceCode: args.deviceCode,
+    });
+    const data = res.data;
+
+    if (data.status === "complete" && data.token) {
+      await storeAuthFromSetup({
+        token: data.token,
+        refreshToken: data.refreshToken,
+        user: data.user,
+      });
+
+      // Mark setup as completed
+      const config = getConfig();
+      config.set("setupCompleted", true);
+    }
+
+    return data;
+  });
+});
 
 // =====================================================================
 // TOOL: search_products
@@ -132,7 +208,7 @@ server.registerTool("search_products", {
       }
     }
     if (!country) {
-      throw new Error("No delivery country available. Add a shipping address first ('clishop address add') or pass the 'country' parameter (e.g. 'US', 'NL', 'BE').");
+      throw new Error("No delivery country available. Add a shipping address first via the add_address tool, or pass the 'country' parameter (e.g. 'US', 'NL', 'BE').");
     }
 
     const res = await api.get("/products/search", {
@@ -222,10 +298,10 @@ server.registerTool("buy_product", {
     const paymentId = args.paymentId || agent.defaultPaymentMethodId;
 
     if (!addressId) {
-      throw new Error("No shipping address set. Add one first via the address_add tool or 'clishop address add'.");
+      throw new Error("No shipping address set. Add one first via the add_address tool.");
     }
     if (!paymentId) {
-      throw new Error("No payment method set. Add one first via 'clishop payment add'.");
+      throw new Error("No payment method linked. Use setup_payment to onboard the user first.");
     }
 
     const api = getApiClient();
@@ -631,7 +707,7 @@ server.registerTool("account_status", {
   return safeCall(async () => {
     const loggedIn = await isLoggedIn();
     if (!loggedIn) {
-      return { loggedIn: false, message: "Not logged in. Run 'clishop login' first." };
+      return { loggedIn: false, message: "Not set up yet. Use the setup_payment tool to onboard the user with a payment link." };
     }
 
     const api = getApiClient();

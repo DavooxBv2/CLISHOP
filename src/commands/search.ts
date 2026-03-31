@@ -658,7 +658,7 @@ export function registerSearchCommands(program: Command): void {
         }
 
         // A delivery country is required for search to work properly
-        if (!shipToCountry) {
+          if (!shipToCountry) {
           const activeAgent = getActiveAgent();
           spinner.fail(chalk.red("No shipping address set — a country is required for searches."));
           console.log();

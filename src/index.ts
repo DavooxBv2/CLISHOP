@@ -27,6 +27,7 @@ program
   .description(
     chalk.bold("CLISHOP") +
       " — Order anything from your terminal.\n\n" +
+      "  Run 'clishop setup' to get started with a single payment link.\n" +
       "  Use agents to set safety limits, addresses, and payment methods.\n" +
       '  The "default" agent is used when no agent is specified.'
   )
