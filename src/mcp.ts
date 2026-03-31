@@ -71,22 +71,22 @@ const server = new McpServer(
 );
 
 // =====================================================================
-// TOOL: setup_payment
+// TOOL: setup
 // =====================================================================
-server.registerTool("setup_payment", {
-  title: "Setup Payment",
+server.registerTool("setup", {
+  title: "Setup",
   description:
     "Onboard a new user by creating their account and generating a Stripe payment setup link. " +
     "The user must open this link in their browser to link their payment method. " +
     "This is the ONLY step requiring human interaction. " +
-    "After the user completes the link, call check_setup_status with the returned deviceCode to get auth tokens. " +
+    "After the user completes the link, call setup_status with the returned deviceCode to get auth tokens. " +
     "The agent can then use add_address to set up shipping autonomously.",
   inputSchema: {
     email: z.string().email().describe("User's email address"),
     name: z.string().describe("User's full name"),
   },
   annotations: {
-    title: "Setup Payment",
+    title: "Setup",
     readOnlyHint: false,
     openWorldHint: true,
   },
@@ -101,24 +101,24 @@ server.registerTool("setup_payment", {
       ...res.data,
       message:
         "Ask the user to open setupUrl in their browser to link their payment method. " +
-        "Then call check_setup_status with the deviceCode to check when they're done.",
+        "Then call setup_status with the deviceCode to check when they're done.",
     };
   });
 });
 
 // =====================================================================
-// TOOL: check_setup_status
+// TOOL: setup_status
 // =====================================================================
-server.registerTool("check_setup_status", {
-  title: "Check Setup Status",
+server.registerTool("setup_status", {
+  title: "Setup Status",
   description:
-    "Poll the setup status after the user was given a payment link via setup_payment. " +
+    "Poll the setup status after the user was given a payment link via the setup tool. " +
     "Returns 'pending' while waiting, 'complete' with auth tokens when done, or 'expired' if timed out.",
   inputSchema: {
-    deviceCode: z.string().describe("The deviceCode returned by setup_payment"),
+    deviceCode: z.string().describe("The deviceCode returned by the setup tool"),
   },
   annotations: {
-    title: "Check Setup Status",
+    title: "Setup Status",
     readOnlyHint: true,
   },
 }, async (args) => {
@@ -301,7 +301,7 @@ server.registerTool("buy_product", {
       throw new Error("No shipping address set. Add one first via the add_address tool.");
     }
     if (!paymentId) {
-      throw new Error("No payment method linked. Use setup_payment to onboard the user first.");
+      throw new Error("No payment method linked. Use the setup tool to onboard the user first.");
     }
 
     const api = getApiClient();
@@ -707,7 +707,7 @@ server.registerTool("account_status", {
   return safeCall(async () => {
     const loggedIn = await isLoggedIn();
     if (!loggedIn) {
-      return { loggedIn: false, message: "Not set up yet. Use the setup_payment tool to onboard the user with a payment link." };
+      return { loggedIn: false, message: "Not set up yet. Use the setup tool to onboard the user with a payment link." };
     }
 
     const api = getApiClient();

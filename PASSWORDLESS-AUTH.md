@@ -2,7 +2,7 @@
 
 ## Objective
 
-Simplify the CLI setup so an AI agent only needs to **show a single link** to onboard a user. Remove password collection from the setup wizard. Add new MCP tools (`setup_payment`, `check_setup_status`) that agents use to initiate onboarding.
+Simplify the CLI setup so an AI agent only needs to **show a single link** to onboard a user. Remove password collection from the setup wizard. Add MCP tools (`setup`, `setup_status`) that agents use to initiate onboarding.
 
 ## Why
 
@@ -13,10 +13,11 @@ Simplify the CLI setup so an AI agent only needs to **show a single link** to on
 
 ## Expected Functionality
 
-1. **New MCP tool: `setup_payment`** — Calls `POST /auth/setup-link` with user's email + name, returns the Stripe URL for the agent to show the user. The agent gives the user this link, they click it, link their card, done.
-2. **New MCP tool: `check_setup_status`** — Polls a device code and returns current status. For agents that prefer to control polling themselves.
-3. **Simplified `clishop setup` command** — Default path: ask email + name → call setup-link → open browser → poll until complete. Legacy wizard available via `--classic` flag.
-4. **Updated `account_status` tool** — Indicates when the user is not authenticated and suggests using `setup_payment`.
+1. **MCP tool: `setup`** — Calls `POST /auth/setup-link` with user's email + name, returns the Stripe URL for the agent to show the user. The agent gives the user this link, they click it, link their card, done.
+2. **MCP tool: `setup_status`** — Polls a device code and returns current status. For agents that prefer to control polling themselves.
+3. **Simplified `clishop setup` command** — Default path: ask email + name → call setup-link → open browser → poll until complete. No legacy wizard.
+4. **Updated `account_status` tool** — Indicates when the user is not authenticated and suggests using the `setup` tool.
+5. **Removed `login` and `register` commands** — No password-based auth. All onboarding goes through `setup`.
 
 ---
 
@@ -24,23 +25,23 @@ Simplify the CLI setup so an AI agent only needs to **show a single link** to on
 
 ### MCP Server (`src/mcp.ts`)
 
-**Add `setup_payment` tool** (after `account_status`):
+**Add `setup` tool** (after `account_status`):
 
 ```typescript
-server.registerTool("setup_payment", {
-  title: "Setup Payment",
+server.registerTool("setup", {
+  title: "Setup",
   description:
     "Onboard a new user by creating their account and generating a Stripe payment setup link. " +
     "The user must open this link in their browser to link their payment method. " +
     "This is the ONLY step requiring human interaction. " +
-    "After the user completes the link, call check_setup_status with the returned deviceCode to get auth tokens. " +
+    "After the user completes the link, call setup_status with the returned deviceCode to get auth tokens. " +
     "The agent can then use add_address to set up shipping autonomously.",
   inputSchema: {
     email: z.string().email().describe("User's email address"),
     name: z.string().describe("User's full name"),
   },
   annotations: {
-    title: "Setup Payment",
+    title: "Setup",
     readOnlyHint: false,
     openWorldHint: true,
   },
@@ -52,19 +53,19 @@ Implementation:
 - Call `POST /auth/setup-link` with `{ email, name }` (no auth header needed — use raw axios)
 - Return `{ setupUrl, deviceCode, message: "Ask the user to open setupUrl in their browser to link their payment method." }`
 
-**Add `check_setup_status` tool:**
+**Add `setup_status` tool:**
 
 ```typescript
-server.registerTool("check_setup_status", {
-  title: "Check Setup Status",
+server.registerTool("setup_status", {
+  title: "Setup Status",
   description:
-    "Poll the setup status after the user was given a payment link via setup_payment. " +
+    "Poll the setup status after the user was given a payment link via the setup tool. " +
     "Returns 'pending' while waiting, 'complete' with auth tokens when done, or 'expired' if timed out.",
   inputSchema: {
-    deviceCode: z.string().describe("The deviceCode returned by setup_payment"),
+    deviceCode: z.string().describe("The deviceCode returned by the setup tool"),
   },
   annotations: {
-    title: "Check Setup Status",
+    title: "Setup Status",
     readOnlyHint: true,
   },
 });
@@ -78,11 +79,11 @@ Implementation:
 
 **Modify `account_status` tool:**
 
-- When `loggedIn: false`, change the message from `"Run 'clishop login' first."` to: `"Not set up yet. Use the setup_payment tool to onboard the user with a payment link."`
+- When `loggedIn: false`, change the message from `"Run 'clishop login' first."` to: `"Not set up yet. Use the setup tool to onboard the user with a payment link."`
 
 **Modify `buy_product` tool:**
 
-- When no payment method is set, change error from `"Add one first via 'clishop payment add'"` to: `"No payment method linked. Use setup_payment to onboard the user first."`
+- When no payment method is set, change error from `"Add one first via 'clishop payment add'"` to: `"No payment method linked. Use the setup tool to onboard the user first."`
 
 ---
 
@@ -119,7 +120,7 @@ Replace the full 5-step wizard with a fork:
 ```
 if (already logged in && has payment method) → "You're all set!"
 if (already logged in && no payment method) → just do payment link flow
-if (not logged in) → new link flow (default) or legacy wizard (--classic)
+if (not logged in) → new link flow (only path — no legacy wizard)
 ```
 
 **New link flow** (the default path):
@@ -150,13 +151,13 @@ No schema changes needed. The existing `setupCompleted`, `defaultPaymentMethodId
 
 ---
 
-### Commands to keep unchanged
+### Commands unchanged
 
-- `clishop login` — still works for password-based users (legacy)
-- `clishop register` — still works for users who want a password
 - `clishop address add` — unchanged, agent uses this autonomously
 - `clishop payment add` — unchanged, works for adding more payment methods after initial setup
 - `clishop payment list` — unchanged
+- `clishop logout` — clears tokens and resets config
+- `clishop whoami` — shows current user info
 
 ---
 
@@ -165,7 +166,7 @@ No schema changes needed. The existing `setupCompleted`, `defaultPaymentMethodId
 ```
 Agent                              CLI/MCP                         User
   │                                   │                              │
-  │ call setup_payment                │                              │
+  │ call setup                       │                              │
   │ { email, name }                   │                              │
   ├──────────────────────────────────►│                              │
   │                                   │── POST /auth/setup-link ──► Backend
@@ -179,7 +180,7 @@ Agent                              CLI/MCP                         User
   │                                   │                              │
   │                                   │         User adds card       │
   │                                   │                              │
-  │ call check_setup_status           │                              │
+  │ call setup_status                 │                              │
   │ { deviceCode }                    │                              │
   ├──────────────────────────────────►│                              │
   │                                   │── POST /auth/device/poll ──► Backend
