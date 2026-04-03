@@ -178,9 +178,9 @@ export interface DevicePollResult {
 }
 
 /** Call POST /auth/setup-link to create an account + Stripe setup link. */
-export async function requestSetupLink(email: string, name: string): Promise<SetupLinkResult> {
+export async function requestSetupLink(email: string): Promise<SetupLinkResult> {
   const baseUrl = getApiBaseUrl();
-  const res = await axios.post(`${baseUrl}/auth/setup-link`, { email, name });
+  const res = await axios.post(`${baseUrl}/auth/setup-link`, { email });
   return res.data as SetupLinkResult;
 }
 

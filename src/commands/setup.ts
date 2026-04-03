@@ -56,15 +56,14 @@ export function registerSetupCommand(program: Command): void {
       "Set up your CLISHOP account — links your payment method via a secure browser link"
     )
     .option("--email <email>", "Email address (skips prompt)")
-    .option("--name <name>", "Full name (skips prompt)")
     .action(async (opts) => {
-      await runSetupWizard(opts.email, opts.name);
+      await runSetupWizard(opts.email);
     });
 }
 
 // ── Streamlined Setup ────────────────────────────────────────────────
 
-export async function runSetupWizard(emailArg?: string, nameArg?: string): Promise<void> {
+export async function runSetupWizard(emailArg?: string): Promise<void> {
   const config = getConfig();
 
   // Already fully set up?
@@ -132,19 +131,12 @@ export async function runSetupWizard(emailArg?: string, nameArg?: string): Promi
   console.log();
 
   let email = emailArg;
-  let name = nameArg;
 
-  if (!email || !name) {
+  if (!email) {
     const answers = await inquirer.prompt([
-      ...(!email
-        ? [{ type: "input" as const, name: "email", message: "Email:" }]
-        : []),
-      ...(!name
-        ? [{ type: "input" as const, name: "name", message: "Your name:" }]
-        : []),
+      { type: "input" as const, name: "email", message: "Email:" },
     ]);
-    email = email || answers.email;
-    name = name || answers.name;
+    email = answers.email;
   }
 
   const spinner = ora("Creating your account and payment link...").start();
@@ -152,7 +144,7 @@ export async function runSetupWizard(emailArg?: string, nameArg?: string): Promi
   let deviceCode: string;
   try {
     const baseUrl = getApiBaseUrl();
-    const res = await axios.post(`${baseUrl}/auth/setup-link`, { email, name });
+    const res = await axios.post(`${baseUrl}/auth/setup-link`, { email });
     setupUrl = res.data.setupUrl;
     deviceCode = res.data.deviceCode;
     spinner.stop();
@@ -166,19 +158,10 @@ export async function runSetupWizard(emailArg?: string, nameArg?: string): Promi
     return;
   }
 
-  // Open browser
   console.log();
-  console.log(chalk.bold("  Open this link to link your payment method:"));
+  console.log(chalk.bold("  Give this link to your human to configure the payment method:"));
   console.log();
   console.log("  " + chalk.cyan.underline(setupUrl));
-  console.log();
-
-  const opened = await openBrowser(setupUrl);
-  if (opened) {
-    console.log(chalk.dim("  (Browser opened automatically)"));
-  } else {
-    console.log(chalk.yellow("  Could not open browser automatically. Please visit the link above."));
-  }
   console.log();
 
   // Poll until complete

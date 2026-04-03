@@ -658,16 +658,18 @@ export function registerSearchCommands(program: Command): void {
         }
 
         // A delivery country is required for search to work properly
-          if (!shipToCountry) {
-          const activeAgent = getActiveAgent();
-          spinner.fail(chalk.red("No shipping address set — a country is required for searches."));
+        if (!shipToCountry) {
+          spinner.stop();
           console.log();
-          console.log(chalk.yellow(`  Your active agent "${activeAgent.name}" has no address configured.`));
-          console.log(chalk.yellow("  Add an address to this agent:"));
+          console.log(chalk.yellow("  Please specify where you want your order shipped:"));
+          console.log();
+          console.log(chalk.white(`    clishop search "${query}" --country US`));
+          console.log(chalk.white(`    clishop search "${query}" --country BE`));
+          console.log(chalk.white(`    clishop search "${query}" --country NL`));
+          console.log();
+          console.log(chalk.dim("  You can use any ISO country code (US, GB, DE, FR, BE, NL, ...)."));
+          console.log(chalk.dim("  Or add an address to skip this step next time:"));
           console.log(chalk.white(`    clishop address add`));
-          console.log();
-          console.log(chalk.dim("  Or specify a country directly for this search:"));
-          console.log(chalk.white(`    clishop search "candle" --country US`));
           console.log();
           return;
         }

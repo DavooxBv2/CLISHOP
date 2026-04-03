@@ -3,7 +3,7 @@ import chalk from "chalk";
 import ora from "ora";
 import inquirer from "inquirer";
 import { getApiClient, handleApiError } from "../api.js";
-import { getActiveAgent, getConfig } from "../config.js";
+import { getActiveAgent, getConfig, updateAgent } from "../config.js";
 
 export interface Order {
   id: string;
@@ -90,7 +90,22 @@ export function registerOrderCommands(program: Command): void {
           console.log(chalk.dim(`  Resolved #${asNumber} → ${cached[index].name} (${productId})\n`));
         }
         const addressId = opts.address || agent.defaultAddressId;
-        const paymentId = opts.payment || agent.defaultPaymentMethodId;
+        let paymentId = opts.payment || agent.defaultPaymentMethodId;
+
+        // Auto-resolve payment method from backend if not set locally
+        if (!paymentId) {
+          try {
+            const api = getApiClient();
+            const pmRes = await api.get("/payment-methods", { params: { agent: agent.name } });
+            const methods = pmRes.data.paymentMethods || [];
+            if (methods.length > 0) {
+              paymentId = methods[0].id;
+              updateAgent(agent.name, { defaultPaymentMethodId: paymentId });
+            }
+          } catch {
+            // API call failed — will show error below
+          }
+        }
 
         if (!addressId) {
           console.error(chalk.red("\n✗ No address set. Add one with: clishop address add"));

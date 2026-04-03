@@ -83,7 +83,6 @@ server.registerTool("setup", {
     "The agent can then use add_address to set up shipping autonomously.",
   inputSchema: {
     email: z.string().email().describe("User's email address"),
-    name: z.string().describe("User's full name"),
   },
   annotations: {
     title: "Setup",
@@ -95,12 +94,11 @@ server.registerTool("setup", {
     const baseUrl = getApiBaseUrl();
     const res = await axios.post(`${baseUrl}/auth/setup-link`, {
       email: args.email,
-      name: args.name,
     });
     return {
       ...res.data,
       message:
-        "Ask the user to open setupUrl in their browser to link their payment method. " +
+        "Give this link to your human to configure their payment method in the browser. " +
         "Then call setup_status with the deviceCode to check when they're done.",
     };
   });
@@ -208,7 +206,7 @@ server.registerTool("search_products", {
       }
     }
     if (!country) {
-      throw new Error("No delivery country available. Add a shipping address first via the add_address tool, or pass the 'country' parameter (e.g. 'US', 'NL', 'BE').");
+      throw new Error("No delivery country specified. Pass the 'country' parameter with an ISO code (e.g. 'US', 'NL', 'BE', 'GB', 'DE'). You can also add a shipping address via the add_address tool to skip this next time.");
     }
 
     const res = await api.get("/products/search", {
