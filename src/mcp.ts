@@ -82,8 +82,7 @@ const server = new McpServer(
 server.registerTool("setup", {
   title: "Setup",
   description:
-    "Start a resumable setup session. Returns a setup URL for the human and a setup_id for the agent to check later. " +
-    "After the human completes the link, call setup_status with the returned setup_id.",
+    "Create or sign in a CLISHOP account using an email address. Setup now completes immediately; add address and payment later when the user is ready to buy.",
   inputSchema: {
     email: z.string().email().describe("User's email address"),
   },
@@ -95,11 +94,15 @@ server.registerTool("setup", {
 }, async (args) => {
   return safeCall(async () => {
     const data = await startSetupSession(args.email);
+    if (data.ok && data.status === "completed") {
+      getConfig().set("setupCompleted", true);
+    }
     return {
       ...data,
       message:
-        "Give this link to your human to configure their payment method in the browser. " +
-        "Then call setup_status with the setup_id to check when they're done.",
+        data.status === "completed"
+          ? "Account ready. Search products now. Only add address and payment once the user decides to buy."
+          : "Legacy setup session created. Call setup_status with the setup_id if you still need to wait for completion.",
     };
   });
 });
@@ -110,8 +113,7 @@ server.registerTool("setup", {
 server.registerTool("setup_status", {
   title: "Setup Status",
   description:
-    "Check the current setup state using the setup_id returned by the setup tool. " +
-    "If setup is complete, auth is stored locally so later CLISHOP calls can proceed.",
+    "Check a legacy setup session by setup_id. Modern email-only setup completes immediately and usually does not need this tool.",
   inputSchema: {
     setupId: z.string().describe("The setup_id returned by the setup tool"),
   },
@@ -292,7 +294,7 @@ server.registerTool("buy_product", {
       throw new Error("No shipping address set. Add one first via the add_address tool.");
     }
     if (!paymentId) {
-      throw new Error("No payment method linked. Use the setup tool to onboard the user first.");
+      throw new Error("No payment method linked. Add one with the payment method tools before placing the order.");
     }
 
     const api = getApiClient();
@@ -698,7 +700,7 @@ server.registerTool("account_status", {
   return safeCall(async () => {
     const loggedIn = await isLoggedIn();
     if (!loggedIn) {
-      return { loggedIn: false, message: "Not set up yet. Use the setup tool to onboard the user with a payment link." };
+      return { loggedIn: false, message: "Not set up yet. Use the setup tool with an email address to create the account." };
     }
 
     const api = getApiClient();

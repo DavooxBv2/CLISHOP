@@ -36,7 +36,7 @@ export function registerPaymentCommands(program: Command): void {
 
         const methods: PaymentMethod[] = res.data.paymentMethods;
         if (methods.length === 0) {
-          console.log(chalk.yellow("\nNo payment methods found. Run: clishop setup\n"));
+          console.log(chalk.yellow("\nNo payment methods found. Run: clishop payment add\n"));
           return;
         }
 
@@ -56,7 +56,7 @@ export function registerPaymentCommands(program: Command): void {
   // ── ADD ────────────────────────────────────────────────────────────
   payment
     .command("add")
-    .description("Add an additional payment method (opens browser). First-time setup? Use 'clishop setup' instead.")
+    .description("Add a payment method (opens browser)")
     .action(async () => {
       try {
         const agent = getActiveAgent();

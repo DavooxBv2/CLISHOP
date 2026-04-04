@@ -163,13 +163,20 @@ export async function storeAuthFromSetup(data: {
 // ---------------------------------------------------------------------------
 
 export interface SetupLinkResult {
-  setupUrl: string;
+  ok?: boolean;
+  setupUrl?: string;
   setupId?: string;
-  deviceCode: string;
-  userCode: string;
-  expiresIn: number;
+  deviceCode?: string;
+  userCode?: string;
+  expiresIn?: number;
   expiresAt?: string;
-  pollInterval: number;
+  pollInterval?: number;
+  completed?: boolean;
+  accountId?: string;
+  humanMessage?: string;
+  token?: string;
+  refreshToken?: string;
+  user?: UserInfo;
 }
 
 export interface DevicePollResult {
@@ -197,11 +204,12 @@ export interface SetupErrorPayload {
 export interface SetupStartResult {
   ok: boolean;
   setup_id: string;
-  status: "pending_user_action";
-  next_action: "open_setup_url";
-  setup_url: string;
-  expires_at: string;
-  poll_after_seconds: number;
+  status: "pending_user_action" | "completed";
+  next_action: "open_setup_url" | "search_products";
+  setup_url?: string;
+  expires_at?: string;
+  poll_after_seconds?: number;
+  account_id?: string;
   human_message: string;
 }
 
@@ -238,11 +246,33 @@ async function postSetupRequest<T>(path: string, body: unknown): Promise<T> {
 export async function startSetupSession(email: string): Promise<SetupStartResult> {
   const data = await postSetupRequest<SetupLinkResult>("/auth/setup-link", { email });
 
-  if (!data.setupUrl || !(data.setupId || data.deviceCode) || !data.expiresIn || !data.pollInterval) {
+  const setupId = data.setupId || data.deviceCode || data.user?.id;
+
+  if (data.token && data.refreshToken && data.user && setupId) {
+    await storeAuthFromSetup({
+      token: data.token,
+      refreshToken: data.refreshToken,
+      user: data.user,
+    });
+
+    return {
+      ok: true,
+      setup_id: setupId,
+      status: "completed",
+      next_action: "search_products",
+      expires_at: data.expiresAt,
+      poll_after_seconds: 0,
+      account_id: data.accountId || data.user.id,
+      human_message:
+        data.humanMessage ||
+        "Account ready. Search now, then add address and payment when you are ready to buy.",
+    };
+  }
+
+  if (!data.setupUrl || !setupId || !data.expiresIn || !data.pollInterval) {
     throw new Error((data as any)?.message || "Failed to create setup session.");
   }
 
-  const setupId = data.setupId || data.deviceCode;
   const expiresAt = data.expiresAt || new Date(Date.now() + data.expiresIn * 1000).toISOString();
 
   return {

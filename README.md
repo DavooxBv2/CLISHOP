@@ -76,33 +76,21 @@ npm link
 
 You can create your account on [clishop.ai](https://clishop.ai) or do everything from the CLI.
 
-### Human-friendly setup
+### Setup
 
-```bash
-clishop setup
-```
+Setup only needs an email address. Search first, then add your address and payment method when you're ready to buy.
 
-This starts the interactive setup flow, creates a resumable setup session, shows a secure payment link, and waits for completion.
-
-### Agent-safe setup
-
-For OpenClaw, MCP clients, Claude-style shells, and other tool runners, use the explicit setup session commands instead of scraping terminal output:
+For OpenClaw, MCP clients, Claude-style shells, and other tool runners, use:
 
 ```bash
 clishop setup start --email user@example.com --json
-clishop setup status --setup-id <setup_id> --json
-clishop setup wait --setup-id <setup_id> --timeout 300 --json
-clishop setup cancel --setup-id <setup_id> --json
 ```
 
-`setup start` returns immediately with:
+`setup start` returns immediately with account-ready status and stores auth locally.
 
-- `setup_id`: the resumable setup session handle for the agent
-- `setup_url`: the link the human must open in a browser
-- `expires_at`: when the session expires
-- `poll_after_seconds`: suggested polling interval
-
-The agent sends `setup_url` to the human and keeps `setup_id` locally for `status`, `wait`, or `cancel`.
+- Search products right away with `clishop search <query>`
+- Add a shipping address later with `clishop address add`
+- Add a payment method later with `clishop payment add`
 
 After setup is complete, add a shipping address and start ordering:
 
@@ -203,10 +191,10 @@ clishop-mcp              # If installed globally
 npx -y clishop --mcp     # Without installing
 ```
 
-The MCP onboarding tools now follow the same resumable setup session model:
+The MCP onboarding tools now follow the same email-first model:
 
-- `setup` starts the session and returns `setup_id` plus `setup_url`
-- `setup_status` checks progress and finalizes auth when setup is complete
+- `setup` creates the account immediately from the email address
+- `setup_status` remains available only for legacy setup IDs
 
 See the [MCP setup guides](https://clishop.ai/docs#mcp-overview) for VS Code, Claude Desktop, Cursor, and Windsurf configuration.
 

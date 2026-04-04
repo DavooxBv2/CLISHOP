@@ -309,7 +309,7 @@ export function registerAdvertiseCommands(program: Command): void {
               paymentMethods = JSON.stringify(selectedPayments);
             }
           } else {
-            console.log(chalk.dim("  No payment methods found. Run: clishop setup"));
+            console.log(chalk.dim("  No payment methods found. Run: clishop payment add"));
           }
         } catch {
           paySpinner.stop();

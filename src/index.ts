@@ -23,12 +23,11 @@ const program = new Command();
 
 program
   .name("clishop")
-  .version("1.5.2")
+  .version("1.5.3")
   .description(
     chalk.bold("CLISHOP") +
       " — Order anything from your terminal.\n\n" +
-      "  Run 'clishop setup' for the human-friendly flow, or\n" +
-      "  'clishop setup start --email <email> --json' for agent-safe setup.\n" +
+      "  Run 'clishop setup <email>' or 'clishop setup start --email <email> --json' to create your account.\n" +
       "  Use agents to set safety limits, addresses, and payment methods.\n" +
       '  The "default" agent is used when no agent is specified.'
   )
@@ -86,7 +85,7 @@ async function main() {
 
       console.error(
         chalk.yellow(
-          "CLISHOP setup is incomplete. Run 'clishop setup start --email <email> --json' in non-interactive environments.",
+          "CLISHOP setup is incomplete. Run 'clishop setup start --email <email> --json' in non-interactive environments, or 'clishop setup <email>' in the CLI.",
         ),
       );
       process.exit(1);

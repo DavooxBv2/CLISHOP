@@ -22,13 +22,13 @@ CLISHOP is an open-source MCP server and CLI that lets AI agents search for prod
 npm install -g clishop
 ```
 
-Then either run `clishop setup` for the human-friendly flow, or use the agent-safe setup session commands:
+Use the email-first setup command:
 
 ```bash
 clishop setup start --email user@example.com --json
-clishop setup status --setup-id <setup_id> --json
-clishop setup wait --setup-id <setup_id> --timeout 300 --json
 ```
+
+Then search products, and only add an address or payment method when the user is ready to buy.
 
 ### MCP Server
 

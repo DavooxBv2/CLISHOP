@@ -133,7 +133,10 @@ export function registerOrderCommands(program: Command): void {
           return;
         }
         if (!paymentId) {
-          console.error(chalk.red("\n✗ No payment method linked. Run: clishop setup"));
+          console.error(chalk.red("\n✗ No payment method linked for this agent."));
+          console.error();
+          console.error(chalk.dim("  Add one when you're ready to buy with:"));
+          console.error(chalk.white("    clishop payment add"));
           process.exitCode = 1;
           return;
         }

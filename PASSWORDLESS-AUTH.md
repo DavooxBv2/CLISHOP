@@ -1,50 +1,34 @@
-# Passwordless Auth — Current Setup Session Flow
+# Passwordless Auth — Current Email-First Flow
 
 ## Summary
 
-CLISHOP now uses a resumable passwordless setup session flow designed for both humans and agent runners.
+CLISHOP now uses an email-first passwordless flow designed for both humans and agent runners.
 
 The core contract is:
 
 ```bash
 clishop setup start --email user@example.com --json
-clishop setup status --setup-id <setup_id> --json
-clishop setup wait --setup-id <setup_id> --timeout 300 --json
-clishop setup cancel --setup-id <setup_id> --json
 ```
-
-The human-friendly `clishop setup` wrapper still exists, but it is layered on top of the same setup session model.
 
 ## Why this changed
 
-The older flow mixed prompts, decorative terminal output, and a blocking wait for browser completion in one command. That works for humans, but it is brittle for OpenClaw, Claude-style shells, MCP agents, and any environment that parses stdout.
+The older flow mixed account creation, payment setup, decorative terminal output, and a blocking wait for browser completion in one command. That works for humans, but it is brittle for OpenClaw, Claude-style shells, MCP agents, and any environment that parses stdout.
 
-The new setup model separates responsibilities cleanly:
+The current model separates responsibilities cleanly:
 
-- `setup_url` is for the human to open in a browser
-- `setup_id` is for the agent or CLI to track the setup lifecycle
+- setup only creates or signs in the account
+- search works immediately after setup
+- address and payment are collected later, only when the user is ready to buy
 
 ## Current CLI behavior
 
-### Human wrapper
+The CLI stores auth locally as soon as the email-based setup succeeds.
 
-```bash
-clishop setup
-```
-
-Behavior:
-
-- asks for email if needed
-- starts a setup session
-- prints the secure setup URL
-- waits for completion
-- stores auth locally when complete
-
-### Agent-safe commands
+### Agent-safe command
 
 #### `clishop setup start`
 
-Starts a setup session and returns immediately.
+Creates or signs in the account and returns immediately.
 
 Example:
 
@@ -57,91 +41,48 @@ Example response:
 ```json
 {
   "ok": true,
-  "setup_id": "dc21271181cf3d7baad7cda8b2b8e43f585d6892a783794e2d3538fdd9448aa9",
-  "status": "pending_user_action",
-  "next_action": "open_setup_url",
-  "setup_url": "https://clishop.ai/setup/payment?token=...&deviceCode=...",
-  "expires_at": "2026-04-04T19:49:57.869Z",
-  "poll_after_seconds": 5,
-  "human_message": "Open this link to securely connect your payment method."
+  "setup_id": "usr_abc123",
+  "status": "completed",
+  "next_action": "search_products",
+  "account_id": "usr_abc123",
+  "human_message": "Account ready. Search now, then add address and payment when you are ready to buy."
 }
 ```
 
-#### `clishop setup status`
+### Legacy commands
 
-Checks the current status without blocking.
-
-Example:
-
-```bash
-clishop setup status --setup-id <setup_id> --json
-```
-
-Possible states:
-
-- `pending_user_action`
-- `processing`
-- `completed`
-- `failed`
-- `expired`
-- `cancelled`
-
-If setup is completed, the CLI will finalize and store auth locally when appropriate.
-
-#### `clishop setup wait`
-
-Convenience helper that waits until the setup completes or times out.
-
-Example:
-
-```bash
-clishop setup wait --setup-id <setup_id> --timeout 300 --json
-```
-
-This is a helper, not the core contract.
-
-#### `clishop setup cancel`
-
-Cancels an active setup session.
-
-Example:
-
-```bash
-clishop setup cancel --setup-id <setup_id> --json
-```
+The legacy `setup status`, `setup wait`, and `setup cancel` commands remain available only for older setup IDs.
 
 ## MCP behavior
 
 The MCP server mirrors the same model:
 
-- `setup` starts the setup session and returns `setup_id` plus `setup_url`
-- `setup_status` checks setup progress and finalizes auth when setup is complete
+- `setup` creates the account immediately from the email address
+- `setup_status` remains only for legacy setup IDs
 
 This allows agent runtimes to:
 
-1. start setup,
-2. send the setup URL to the human,
-3. check status later using the setup ID,
-4. continue ordering once setup is complete.
+1. create the account,
+2. search products immediately,
+3. collect address and payment only when the user decides to buy.
 
 ## Backend endpoints involved
 
-The current setup session flow uses these unauthenticated endpoints:
+The current email-first flow uses this unauthenticated endpoint:
 
 - `POST /auth/setup-link`
+
+Legacy compatibility endpoints still exist:
+
 - `POST /auth/setup/status`
 - `POST /auth/setup/cancel`
 - `POST /auth/setup/claim`
 - `POST /auth/setup-payment`
-
-The legacy compatibility endpoint still exists:
-
 - `POST /auth/device/poll`
 
 ## Notes
 
-- `setup_id` currently maps directly to the backend `deviceCode`
-- the setup URL is reusable until expiry
-- the default expiry is 30 minutes
+- setup stores auth immediately on success
+- payment collection moved to `clishop payment add` and the buy flow
 - in JSON mode, stdout is JSON only
-- non-interactive environments should prefer `setup start/status/wait/cancel` over the human wrapper
+- non-interactive environments should prefer `setup start` over prompt-based flows
