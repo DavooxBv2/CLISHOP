@@ -23,7 +23,7 @@ const program = new Command();
 
 program
   .name("clishop")
-  .version("1.4.6")
+  .version("1.4.7")
   .description(
     chalk.bold("CLISHOP") +
       " — Order anything from your terminal.\n\n" +

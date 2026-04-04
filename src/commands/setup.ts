@@ -1,4 +1,5 @@
 declare const BUILD_TIMESTAMP: string;
+declare const BUILD_VERSION: string;
 
 import { Command } from "commander";
 import chalk from "chalk";
@@ -113,6 +114,7 @@ export async function runSetupWizard(emailArg?: string): Promise<void> {
   console.log();
   console.log(chalk.bold.cyan("      W E L C O M E   T O   C L I S H O P"));
   console.log(chalk.dim("      Order anything from your terminal."));
+  console.log(chalk.dim(`      npm:   v${BUILD_VERSION}`));
   console.log(chalk.dim(`      Build: ${BUILD_TIMESTAMP}`));
   console.log();
   divider(chalk.cyan);
