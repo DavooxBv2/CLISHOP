@@ -47,6 +47,17 @@ function divider(color: typeof chalk.cyan = chalk.cyan): void {
   console.log("  " + color("─".repeat(48)));
 }
 
+function printSetupLink(message: string, setupUrl: string): void {
+  console.log();
+  console.log(chalk.bold(`  ${message}`));
+  console.log();
+  console.log("  " + chalk.cyan.underline(setupUrl));
+  console.log();
+  console.log(chalk.dim("  Setup URL (plain text):"));
+  console.log("  " + setupUrl);
+  console.log();
+}
+
 // ── Command Registration ───────────────────────────────────────────────
 
 export function registerSetupCommand(program: Command): void {
@@ -158,14 +169,15 @@ export async function runSetupWizard(emailArg?: string): Promise<void> {
     return;
   }
 
-  console.log();
-  console.log(chalk.bold("  Give this link to your human to configure the payment method:"));
-  console.log();
-  console.log("  " + chalk.cyan.underline(setupUrl));
-  console.log();
+  printSetupLink(
+    "Give this link to your human to configure the payment method:",
+    setupUrl
+  );
 
   // Poll until complete
-  const pollSpinner = ora("Waiting for you to complete payment setup...").start();
+  console.log(chalk.dim("  Waiting for you to complete payment setup..."));
+  console.log(chalk.dim("  If your terminal UI hides earlier output, use the plain-text URL above."));
+  console.log();
   const baseUrl = getApiBaseUrl();
   const maxAttempts = 120; // 10 minutes at 5s intervals
   let completed = false;
@@ -183,12 +195,12 @@ export async function runSetupWizard(emailArg?: string): Promise<void> {
           user: data.user,
         });
         config.set("setupCompleted", true);
-        pollSpinner.succeed(chalk.green("Payment linked and account activated!"));
+        console.log(chalk.green("  ✓ Payment linked and account activated!"));
         completed = true;
         break;
       }
       if (data.status === "expired") {
-        pollSpinner.fail(chalk.red("Setup link expired. Run ") + chalk.white("clishop setup") + chalk.red(" to try again."));
+        console.log(chalk.red("  Setup link expired. Run ") + chalk.white("clishop setup") + chalk.red(" to try again."));
         process.exitCode = 1;
         return;
       }
@@ -199,7 +211,7 @@ export async function runSetupWizard(emailArg?: string): Promise<void> {
   }
 
   if (!completed) {
-    pollSpinner.fail(chalk.red("Timed out waiting for setup. Run ") + chalk.white("clishop setup") + chalk.red(" to try again."));
+    console.log(chalk.red("  Timed out waiting for setup. Run ") + chalk.white("clishop setup") + chalk.red(" to try again."));
     process.exitCode = 1;
     return;
   }
@@ -250,11 +262,7 @@ async function runPaymentLinkFlow(config: ReturnType<typeof getConfig>): Promise
     spinner.stop();
 
     const { setupUrl } = res.data;
-    console.log();
-    console.log(chalk.bold("  Open this link to link your payment method:"));
-    console.log();
-    console.log("  " + chalk.cyan.underline(setupUrl));
-    console.log();
+    printSetupLink("Open this link to link your payment method:", setupUrl);
 
     const opened = await openBrowser(setupUrl);
     if (opened) {
