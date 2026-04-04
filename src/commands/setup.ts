@@ -2,7 +2,6 @@ declare const BUILD_TIMESTAMP: string;
 
 import { Command } from "commander";
 import chalk from "chalk";
-import ora from "ora";
 import inquirer from "inquirer";
 import open from "open";
 import { execFileSync } from "child_process";
@@ -150,7 +149,7 @@ export async function runSetupWizard(emailArg?: string): Promise<void> {
     email = answers.email;
   }
 
-  const spinner = ora("Creating your account and payment link...").start();
+  console.log(chalk.dim("  Creating your account and payment link..."));
   let setupUrl: string;
   let deviceCode: string;
   try {
@@ -158,10 +157,9 @@ export async function runSetupWizard(emailArg?: string): Promise<void> {
     const res = await axios.post(`${baseUrl}/auth/setup-link`, { email });
     setupUrl = res.data.setupUrl;
     deviceCode = res.data.deviceCode;
-    spinner.stop();
   } catch (error: any) {
     const msg = error?.response?.data?.message || error.message;
-    spinner.fail(chalk.red(`Setup failed: ${msg}`));
+    console.log(chalk.red(`  ✗ Setup failed: ${msg}`));
     console.log();
     console.log(chalk.dim("  You can try again with: ") + chalk.white("clishop setup"));
     console.log();
@@ -253,13 +251,12 @@ export async function runSetupWizard(emailArg?: string): Promise<void> {
 // ── Payment link flow (for logged-in users without a payment method) ─
 
 async function runPaymentLinkFlow(config: ReturnType<typeof getConfig>): Promise<void> {
-  const spinner = ora("Requesting secure payment setup link...").start();
+  console.log(chalk.dim("  Requesting secure payment setup link..."));
   try {
     const api = getApiClient();
     const agent = getActiveAgent();
     await ensureAgentOnBackend(agent.name);
     const res = await api.post("/payment-methods/setup", { agent: agent.name });
-    spinner.stop();
 
     const { setupUrl } = res.data;
     printSetupLink("Open this link to link your payment method:", setupUrl);
@@ -274,19 +271,19 @@ async function runPaymentLinkFlow(config: ReturnType<typeof getConfig>): Promise
       { type: "input", name: "done", message: "Press Enter after completing payment setup in your browser..." },
     ]);
 
-    const checkSpinner = ora("Checking for your payment method...").start();
+    console.log(chalk.dim("  Checking for your payment method..."));
     const pmRes = await api.get("/payment-methods", { params: { agent: agent.name } });
     const methods = pmRes.data.paymentMethods || [];
     if (methods.length > 0) {
       const latest = methods[methods.length - 1];
       updateAgent(agent.name, { defaultPaymentMethodId: latest.id });
-      checkSpinner.succeed(chalk.green(`Payment method "${latest.label}" linked and set as default.`));
+      console.log(chalk.green(`  ✓ Payment method "${latest.label}" linked and set as default.`));
       config.set("setupCompleted", true);
     } else {
-      checkSpinner.warn(chalk.yellow("No payment method found yet. Run ") + chalk.white("clishop setup") + chalk.yellow(" to try again."));
+      console.log(chalk.yellow("  ⚠ No payment method found yet. Run ") + chalk.white("clishop setup") + chalk.yellow(" to try again."));
     }
   } catch (error: any) {
-    spinner.fail(chalk.red(`Could not get setup link: ${error?.response?.data?.message || error.message}`));
+    console.log(chalk.red(`  ✗ Could not get setup link: ${error?.response?.data?.message || error.message}`));
   }
   console.log();
 }
