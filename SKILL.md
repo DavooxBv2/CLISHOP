@@ -22,7 +22,13 @@ CLISHOP is an open-source MCP server and CLI that lets AI agents search for prod
 npm install -g clishop
 ```
 
-Then run `clishop setup` to create an account, add an address, and link a payment method.
+Then either run `clishop setup` for the human-friendly flow, or use the agent-safe setup session commands:
+
+```bash
+clishop setup start --email user@example.com --json
+clishop setup status --setup-id <setup_id> --json
+clishop setup wait --setup-id <setup_id> --timeout 300 --json
+```
 
 ### MCP Server
 
@@ -61,7 +67,7 @@ npx -y clishop --mcp     # Without installing
 |----------|----------|-------------|
 | `CLISHOP_API_URL` | No | Override the API base URL (defaults to `https://clishop-backend.vercel.app/api`) |
 
-Authentication is handled via `clishop login` which stores a session token securely in the OS keychain (via keytar). No API key env var is needed.
+Authentication is handled through the setup flow, which stores the session token securely in the OS keychain when available (via keytar) or falls back to local file storage. No API key env var is needed.
 
 ## External Endpoints
 

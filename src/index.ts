@@ -23,11 +23,12 @@ const program = new Command();
 
 program
   .name("clishop")
-  .version("1.5.0")
+  .version("1.5.1")
   .description(
     chalk.bold("CLISHOP") +
       " — Order anything from your terminal.\n\n" +
-      "  Run 'clishop setup' to get started with a single payment link.\n" +
+      "  Run 'clishop setup' for the human-friendly flow, or\n" +
+      "  'clishop setup start --email <email> --json' for agent-safe setup.\n" +
       "  Use agents to set safety limits, addresses, and payment methods.\n" +
       '  The "default" agent is used when no agent is specified.'
   )

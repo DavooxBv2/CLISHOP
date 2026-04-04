@@ -15,6 +15,7 @@ export function registerStatusCommand(program: Command): void {
         // Check login
         if (!(await isLoggedIn())) {
           console.log(chalk.yellow("\nNot set up yet. Run: clishop setup\n"));
+          console.log(chalk.dim("For agent runners, use: clishop setup start --email <email> --json\n"));
           return;
         }
 

@@ -1,198 +1,147 @@
-# Passwordless Auth — CLI Analysis
+# Passwordless Auth — Current Setup Session Flow
 
-## Objective
+## Summary
 
-Simplify the CLI setup so an AI agent only needs to **show a single link** to onboard a user. Remove password collection from the setup wizard. Add MCP tools (`setup`, `setup_status`) that agents use to initiate onboarding.
+CLISHOP now uses a resumable passwordless setup session flow designed for both humans and agent runners.
 
-## Why
+The core contract is:
 
-- AI agents can't (and shouldn't) handle passwords
-- Address creation is already a separate MCP tool (`add_address`) that the agent can handle autonomously
-- The only step requiring human interaction is linking a payment method (Stripe)
-- The CLI setup wizard currently has 5 steps — it should have 1 for agent-driven onboarding
-
-## Expected Functionality
-
-1. **MCP tool: `setup`** — Calls `POST /auth/setup-link` with user's email + name, returns the Stripe URL for the agent to show the user. The agent gives the user this link, they click it, link their card, done.
-2. **MCP tool: `setup_status`** — Polls a device code and returns current status. For agents that prefer to control polling themselves.
-3. **Simplified `clishop setup` command** — Default path: ask email + name → call setup-link → open browser → poll until complete. No legacy wizard.
-4. **Updated `account_status` tool** — Indicates when the user is not authenticated and suggests using the `setup` tool.
-5. **Removed `login` and `register` commands** — No password-based auth. All onboarding goes through `setup`.
-
----
-
-## Detailed Changes
-
-### MCP Server (`src/mcp.ts`)
-
-**Add `setup` tool** (after `account_status`):
-
-```typescript
-server.registerTool("setup", {
-  title: "Setup",
-  description:
-    "Onboard a new user by creating their account and generating a Stripe payment setup link. " +
-    "The user must open this link in their browser to link their payment method. " +
-    "This is the ONLY step requiring human interaction. " +
-    "After the user completes the link, call setup_status with the returned deviceCode to get auth tokens. " +
-    "The agent can then use add_address to set up shipping autonomously.",
-  inputSchema: {
-    email: z.string().email().describe("User's email address"),
-    name: z.string().describe("User's full name"),
-  },
-  annotations: {
-    title: "Setup",
-    readOnlyHint: false,
-    openWorldHint: true,
-  },
-});
+```bash
+clishop setup start --email user@example.com --json
+clishop setup status --setup-id <setup_id> --json
+clishop setup wait --setup-id <setup_id> --timeout 300 --json
+clishop setup cancel --setup-id <setup_id> --json
 ```
 
-Implementation:
+The human-friendly `clishop setup` wrapper still exists, but it is layered on top of the same setup session model.
 
-- Call `POST /auth/setup-link` with `{ email, name }` (no auth header needed — use raw axios)
-- Return `{ setupUrl, deviceCode, message: "Ask the user to open setupUrl in their browser to link their payment method." }`
+## Why this changed
 
-**Add `setup_status` tool:**
+The older flow mixed prompts, decorative terminal output, and a blocking wait for browser completion in one command. That works for humans, but it is brittle for OpenClaw, Claude-style shells, MCP agents, and any environment that parses stdout.
 
-```typescript
-server.registerTool("setup_status", {
-  title: "Setup Status",
-  description:
-    "Poll the setup status after the user was given a payment link via the setup tool. " +
-    "Returns 'pending' while waiting, 'complete' with auth tokens when done, or 'expired' if timed out.",
-  inputSchema: {
-    deviceCode: z.string().describe("The deviceCode returned by the setup tool"),
-  },
-  annotations: {
-    title: "Setup Status",
-    readOnlyHint: true,
-  },
-});
+The new setup model separates responsibilities cleanly:
+
+- `setup_url` is for the human to open in a browser
+- `setup_id` is for the agent or CLI to track the setup lifecycle
+
+## Current CLI behavior
+
+### Human wrapper
+
+```bash
+clishop setup
 ```
 
-Implementation:
+Behavior:
 
-- Call `POST /auth/device/poll` with `{ deviceCode }` (no auth header)
-- If `status === "complete"`: store tokens via `storeToken()`, `storeRefreshToken()`, `storeUserInfo()`, return the result
-- If `status === "pending"` or `"expired"`: return as-is
+- asks for email if needed
+- starts a setup session
+- prints the secure setup URL
+- waits for completion
+- stores auth locally when complete
 
-**Modify `account_status` tool:**
+### Agent-safe commands
 
-- When `loggedIn: false`, change the message from `"Run 'clishop login' first."` to: `"Not set up yet. Use the setup tool to onboard the user with a payment link."`
+#### `clishop setup start`
 
-**Modify `buy_product` tool:**
+Starts a setup session and returns immediately.
 
-- When no payment method is set, change error from `"Add one first via 'clishop payment add'"` to: `"No payment method linked. Use the setup tool to onboard the user first."`
+Example:
 
----
+```bash
+clishop setup start --email user@example.com --json
+```
 
-### Auth (`src/auth.ts`)
+Example response:
 
-**Add `storeAuthFromSetup` helper:**
-
-```typescript
-export async function storeAuthFromSetup(data: {
-  token: string;
-  refreshToken: string;
-  user: UserInfo;
-}): Promise<void> {
-  await storeToken(data.token);
-  await storeRefreshToken(data.refreshToken);
-  await storeUserInfo(data.user);
+```json
+{
+  "ok": true,
+  "setup_id": "dc21271181cf3d7baad7cda8b2b8e43f585d6892a783794e2d3538fdd9448aa9",
+  "status": "pending_user_action",
+  "next_action": "open_setup_url",
+  "setup_url": "https://clishop.ai/setup/payment?token=...&deviceCode=...",
+  "expires_at": "2026-04-04T19:49:57.869Z",
+  "poll_after_seconds": 5,
+  "human_message": "Open this link to securely connect your payment method."
 }
 ```
 
----
+#### `clishop setup status`
 
-### API (`src/api.ts`)
+Checks the current status without blocking.
 
-For the two unauthenticated calls (`setup-link` and `device/poll`), use raw `axios.post()` directly against the base URL. No need for a full separate client — there are only 2 unauthenticated endpoints.
+Example:
 
----
-
-### Setup Command (`src/commands/setup.ts`)
-
-**Restructure `runSetupWizard`:**
-
-Replace the full 5-step wizard with a fork:
-
-```
-if (already logged in && has payment method) → "You're all set!"
-if (already logged in && no payment method) → just do payment link flow
-if (not logged in) → new link flow (only path — no legacy wizard)
+```bash
+clishop setup status --setup-id <setup_id> --json
 ```
 
-**New link flow** (the default path):
+Possible states:
 
-1. Ask for email + name (or accept via `--email` / `--name` flags)
-2. Call `POST /auth/setup-link` with `{ email, name }`
-3. Open `setupUrl` in browser
-4. Print the URL as fallback
-5. Poll `POST /auth/device/poll` every 5 seconds with a spinner
-6. On complete: store tokens, mark `setupCompleted: true`
-7. Print: `"✓ Payment linked! Your agent can now add addresses and place orders."`
+- `pending_user_action`
+- `processing`
+- `completed`
+- `failed`
+- `expired`
+- `cancelled`
 
-**Keep legacy wizard** as `clishop setup --classic` for users who prefer the full interactive experience.
+If setup is completed, the CLI will finalize and store auth locally when appropriate.
 
-**Remove address step from the default setup flow.** The agent handles addresses via `add_address`, or the user can do `clishop address add` separately.
+#### `clishop setup wait`
 
----
+Convenience helper that waits until the setup completes or times out.
 
-### Index (`src/index.ts`)
+Example:
 
-No changes needed — first-run detection already calls `runSetupWizard()`.
-
----
-
-### Config (`src/config.ts`)
-
-No schema changes needed. The existing `setupCompleted`, `defaultPaymentMethodId`, `defaultAddressId` fields work as-is.
-
----
-
-### Commands unchanged
-
-- `clishop address add` — unchanged, agent uses this autonomously
-- `clishop payment add` — unchanged, works for adding more payment methods after initial setup
-- `clishop payment list` — unchanged
-- `clishop logout` — clears tokens and resets config
-- `clishop whoami` — shows current user info
-
----
-
-## Agent Flow After Implementation
-
+```bash
+clishop setup wait --setup-id <setup_id> --timeout 300 --json
 ```
-Agent                              CLI/MCP                         User
-  │                                   │                              │
-  │ call setup                       │                              │
-  │ { email, name }                   │                              │
-  ├──────────────────────────────────►│                              │
-  │                                   │── POST /auth/setup-link ──► Backend
-  │                                   │◄── { setupUrl, deviceCode }  │
-  │◄──────────────────────────────────┤                              │
-  │ { setupUrl, deviceCode }          │                              │
-  │                                   │                              │
-  │ "Open this link to link           │                              │
-  │  your payment method:             │                              │
-  │  https://checkout.stripe.com/..." ──────────────────────────────►│
-  │                                   │                              │
-  │                                   │         User adds card       │
-  │                                   │                              │
-  │ call setup_status                 │                              │
-  │ { deviceCode }                    │                              │
-  ├──────────────────────────────────►│                              │
-  │                                   │── POST /auth/device/poll ──► Backend
-  │                                   │◄── { status: "complete" }    │
-  │                                   │    stores tokens locally     │
-  │◄──────────────────────────────────┤                              │
-  │ { status: "complete", user }      │                              │
-  │                                   │                              │
-  │ call add_address                  │                              │
-  │ { line1, city, country, ... }     │                              │
-  ├──────────────────────────────────►│                              │
-  │                                   │── POST /addresses ────────► Backend
-  │                                   │                              │
-  │ ✓ Ready for autonomous ordering   │                              │
+
+This is a helper, not the core contract.
+
+#### `clishop setup cancel`
+
+Cancels an active setup session.
+
+Example:
+
+```bash
+clishop setup cancel --setup-id <setup_id> --json
 ```
+
+## MCP behavior
+
+The MCP server mirrors the same model:
+
+- `setup` starts the setup session and returns `setup_id` plus `setup_url`
+- `setup_status` checks setup progress and finalizes auth when setup is complete
+
+This allows agent runtimes to:
+
+1. start setup,
+2. send the setup URL to the human,
+3. check status later using the setup ID,
+4. continue ordering once setup is complete.
+
+## Backend endpoints involved
+
+The current setup session flow uses these unauthenticated endpoints:
+
+- `POST /auth/setup-link`
+- `POST /auth/setup/status`
+- `POST /auth/setup/cancel`
+- `POST /auth/setup/claim`
+- `POST /auth/setup-payment`
+
+The legacy compatibility endpoint still exists:
+
+- `POST /auth/device/poll`
+
+## Notes
+
+- `setup_id` currently maps directly to the backend `deviceCode`
+- the setup URL is reusable until expiry
+- the default expiry is 30 minutes
+- in JSON mode, stdout is JSON only
+- non-interactive environments should prefer `setup start/status/wait/cancel` over the human wrapper

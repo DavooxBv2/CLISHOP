@@ -37,6 +37,7 @@ export function registerAuthCommands(program: Command): void {
     .action(async () => {
       if (!(await isLoggedIn())) {
         console.log(chalk.yellow("Not set up yet. Run: clishop setup"));
+        console.log(chalk.dim("For agent runners, use: clishop setup start --email <email> --json"));
         return;
       }
       const user = await getUserInfo();
