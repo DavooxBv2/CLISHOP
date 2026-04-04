@@ -21,7 +21,13 @@ import { z } from "zod/v4";
 import axios from "axios";
 import { getApiClient, handleApiError } from "./api.js";
 import { getActiveAgent, getConfig, getApiBaseUrl } from "./config.js";
-import { isLoggedIn, getUserInfo, storeAuthFromSetup } from "./auth.js";
+import {
+  claimSetupSession,
+  getSetupStatus,
+  isLoggedIn,
+  getUserInfo,
+  startSetupSession,
+} from "./auth.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -76,11 +82,8 @@ const server = new McpServer(
 server.registerTool("setup", {
   title: "Setup",
   description:
-    "Onboard a new user by creating their account and generating a Stripe payment setup link. " +
-    "The user must open this link in their browser to link their payment method. " +
-    "This is the ONLY step requiring human interaction. " +
-    "After the user completes the link, call setup_status with the returned deviceCode to get auth tokens. " +
-    "The agent can then use add_address to set up shipping autonomously.",
+    "Start a resumable setup session. Returns a setup URL for the human and a setup_id for the agent to check later. " +
+    "After the human completes the link, call setup_status with the returned setup_id.",
   inputSchema: {
     email: z.string().email().describe("User's email address"),
   },
@@ -91,15 +94,12 @@ server.registerTool("setup", {
   },
 }, async (args) => {
   return safeCall(async () => {
-    const baseUrl = getApiBaseUrl();
-    const res = await axios.post(`${baseUrl}/auth/setup-link`, {
-      email: args.email,
-    });
+    const data = await startSetupSession(args.email);
     return {
-      ...res.data,
+      ...data,
       message:
         "Give this link to your human to configure their payment method in the browser. " +
-        "Then call setup_status with the deviceCode to check when they're done.",
+        "Then call setup_status with the setup_id to check when they're done.",
     };
   });
 });
@@ -110,10 +110,10 @@ server.registerTool("setup", {
 server.registerTool("setup_status", {
   title: "Setup Status",
   description:
-    "Poll the setup status after the user was given a payment link via the setup tool. " +
-    "Returns 'pending' while waiting, 'complete' with auth tokens when done, or 'expired' if timed out.",
+    "Check the current setup state using the setup_id returned by the setup tool. " +
+    "If setup is complete, auth is stored locally so later CLISHOP calls can proceed.",
   inputSchema: {
-    deviceCode: z.string().describe("The deviceCode returned by the setup tool"),
+    setupId: z.string().describe("The setup_id returned by the setup tool"),
   },
   annotations: {
     title: "Setup Status",
@@ -121,22 +121,15 @@ server.registerTool("setup_status", {
   },
 }, async (args) => {
   return safeCall(async () => {
-    const baseUrl = getApiBaseUrl();
-    const res = await axios.post(`${baseUrl}/auth/device/poll`, {
-      deviceCode: args.deviceCode,
-    });
-    const data = res.data;
+    let data = await getSetupStatus(args.setupId);
 
-    if (data.status === "complete" && data.token) {
-      await storeAuthFromSetup({
-        token: data.token,
-        refreshToken: data.refreshToken,
-        user: data.user,
-      });
+    if (data.ok && data.status === "completed") {
+      data = await claimSetupSession(args.setupId);
 
-      // Mark setup as completed
-      const config = getConfig();
-      config.set("setupCompleted", true);
+      if (data.ok) {
+        const config = getConfig();
+        config.set("setupCompleted", true);
+      }
     }
 
     return data;

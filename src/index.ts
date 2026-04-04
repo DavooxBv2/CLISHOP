@@ -23,7 +23,7 @@ const program = new Command();
 
 program
   .name("clishop")
-  .version("1.4.7")
+  .version("1.5.0")
   .description(
     chalk.bold("CLISHOP") +
       " — Order anything from your terminal.\n\n" +
@@ -78,7 +78,17 @@ async function main() {
   if (!hasSubcommand) {
     const config = getConfig();
     if (!config.get("setupCompleted")) {
-      await runSetupWizard();
+      if (process.stdin.isTTY && process.stdout.isTTY) {
+        await runSetupWizard();
+        return;
+      }
+
+      console.error(
+        chalk.yellow(
+          "CLISHOP setup is incomplete. Run 'clishop setup start --email <email> --json' in non-interactive environments.",
+        ),
+      );
+      process.exit(1);
       return;
     }
   }

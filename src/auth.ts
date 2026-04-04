@@ -164,9 +164,11 @@ export async function storeAuthFromSetup(data: {
 
 export interface SetupLinkResult {
   setupUrl: string;
+  setupId?: string;
   deviceCode: string;
   userCode: string;
   expiresIn: number;
+  expiresAt?: string;
   pollInterval: number;
 }
 
@@ -175,6 +177,145 @@ export interface DevicePollResult {
   token?: string;
   refreshToken?: string;
   user?: UserInfo;
+}
+
+export type SetupLifecycleStatus =
+  | "pending_user_action"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "expired"
+  | "cancelled";
+
+export interface SetupErrorPayload {
+  code: string;
+  message: string;
+  setup_id?: string;
+  setup_url?: string;
+}
+
+export interface SetupStartResult {
+  ok: boolean;
+  setup_id: string;
+  status: "pending_user_action";
+  next_action: "open_setup_url";
+  setup_url: string;
+  expires_at: string;
+  poll_after_seconds: number;
+  human_message: string;
+}
+
+export interface SetupStatusResult {
+  ok: boolean;
+  setup_id?: string;
+  status?: SetupLifecycleStatus;
+  account_id?: string;
+  expires_at?: string;
+  poll_after_seconds?: number;
+  error?: SetupErrorPayload;
+}
+
+export interface SetupClaimResult extends SetupStatusResult {
+  token?: string;
+  refreshToken?: string;
+  user?: UserInfo;
+}
+
+async function postSetupRequest<T>(path: string, body: unknown): Promise<T> {
+  const baseUrl = getApiBaseUrl();
+
+  try {
+    const res = await axios.post(`${baseUrl}${path}`, body);
+    return res.data as T;
+  } catch (error: any) {
+    if (error?.response?.data) {
+      return error.response.data as T;
+    }
+    throw error;
+  }
+}
+
+export async function startSetupSession(email: string): Promise<SetupStartResult> {
+  const data = await postSetupRequest<SetupLinkResult>("/auth/setup-link", { email });
+
+  if (!data.setupUrl || !(data.setupId || data.deviceCode) || !data.expiresIn || !data.pollInterval) {
+    throw new Error((data as any)?.message || "Failed to create setup session.");
+  }
+
+  const setupId = data.setupId || data.deviceCode;
+  const expiresAt = data.expiresAt || new Date(Date.now() + data.expiresIn * 1000).toISOString();
+
+  return {
+    ok: true,
+    setup_id: setupId,
+    status: "pending_user_action",
+    next_action: "open_setup_url",
+    setup_url: data.setupUrl,
+    expires_at: expiresAt,
+    poll_after_seconds: data.pollInterval,
+    human_message: "Open this link to securely connect your payment method.",
+  };
+}
+
+export async function getSetupStatus(setupId: string): Promise<SetupStatusResult> {
+  return postSetupRequest<SetupStatusResult>("/auth/setup/status", { setupId });
+}
+
+export async function cancelSetupSession(setupId: string): Promise<SetupStatusResult> {
+  return postSetupRequest<SetupStatusResult>("/auth/setup/cancel", { setupId });
+}
+
+export async function claimSetupSession(
+  setupId: string,
+  { storeAuth = true } = {},
+): Promise<SetupClaimResult> {
+  const data = await postSetupRequest<SetupClaimResult>("/auth/setup/claim", { setupId });
+
+  if (storeAuth && data.ok && data.token && data.refreshToken && data.user) {
+    await storeAuthFromSetup({
+      token: data.token,
+      refreshToken: data.refreshToken,
+      user: data.user,
+    });
+  }
+
+  return data;
+}
+
+export async function waitForSetupSession(
+  setupId: string,
+  { timeout = 300_000 } = {},
+): Promise<SetupStatusResult | SetupClaimResult> {
+  const deadline = Date.now() + timeout;
+
+  while (Date.now() < deadline) {
+    const status = await getSetupStatus(setupId);
+
+    if (status.status === "completed") {
+      return claimSetupSession(setupId);
+    }
+
+    if (
+      status.status === "expired" ||
+      status.status === "cancelled" ||
+      status.status === "failed"
+    ) {
+      return status;
+    }
+
+    const waitMs = Math.max(1, status.poll_after_seconds || 5) * 1000;
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+  }
+
+  return {
+    ok: false,
+    setup_id: setupId,
+    status: "pending_user_action",
+    error: {
+      code: "human_action_required",
+      message: "Timed out waiting for payment setup to complete.",
+    },
+  };
 }
 
 /** Call POST /auth/setup-link to create an account + Stripe setup link. */
