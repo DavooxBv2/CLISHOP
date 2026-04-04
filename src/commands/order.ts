@@ -53,6 +53,26 @@ const STATUS_COLORS: Record<string, (s: string) => string> = {
   cancelled: chalk.red,
 };
 
+function printMissingAddressGuidance(): void {
+  console.error();
+  console.error(chalk.red("✗ No delivery address is set for this agent."));
+  console.error();
+  console.error(chalk.dim("  To buy something, you need a delivery address first."));
+  console.error(chalk.dim("  Ask your human for the delivery address, or if you already know their home address,"));
+  console.error(chalk.dim("  suggest it yourself in full and ask them to confirm that it is correct."));
+  console.error();
+  console.error(chalk.bold("  Suggested format:"));
+  console.error(chalk.white("    First + Last Name"));
+  console.error(chalk.white("    Street + number"));
+  console.error(chalk.white("    City + ZIP code"));
+  console.error(chalk.white("    Country"));
+  console.error(chalk.white("    Phone number"));
+  console.error();
+  console.error(chalk.dim("  Once confirmed, save it as the Home address with:"));
+  console.error(chalk.white("    clishop address add"));
+  console.error();
+}
+
 export function registerOrderCommands(program: Command): void {
   const order = program
     .command("order")
@@ -108,7 +128,7 @@ export function registerOrderCommands(program: Command): void {
         }
 
         if (!addressId) {
-          console.error(chalk.red("\n✗ No address set. Add one with: clishop address add"));
+          printMissingAddressGuidance();
           process.exitCode = 1;
           return;
         }
