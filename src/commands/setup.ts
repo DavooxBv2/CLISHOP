@@ -63,10 +63,6 @@ function writeJson(payload: unknown): void {
   process.stdout.write(JSON.stringify(payload, null, 2) + "\n");
 }
 
-function isInteractiveSession(): boolean {
-  return Boolean(process.stdin.isTTY && process.stdout.isTTY);
-}
-
 function isLikelyEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
@@ -95,6 +91,17 @@ function printSetupLink(message: string, setupUrl: string): void {
   console.log();
   console.log(chalk.dim("  Setup URL (plain text):"));
   console.log("  " + setupUrl);
+  console.log();
+}
+
+function printSetupEmailInstructions(): void {
+  console.log(chalk.yellow("  Email is required to start setup."));
+  console.log();
+  console.log(chalk.dim("  Human-friendly:"));
+  console.log(chalk.white("    clishop setup user@example.com"));
+  console.log();
+  console.log(chalk.dim("  Agent-safe JSON:"));
+  console.log(chalk.white("    clishop setup start --email user@example.com --json"));
   console.log();
 }
 
@@ -417,16 +424,9 @@ export async function runSetupWizard(
 
   let email = emailArg?.trim();
   if (!email) {
-    if (!isInteractiveSession()) {
-      console.error(chalk.red("\n✗ Email is required in non-interactive mode. Use: clishop setup start --email <email> --json\n"));
-      process.exitCode = 1;
-      return;
-    }
-
-    const answers = await inquirer.prompt([
-      { type: "input" as const, name: "email", message: "Email:" },
-    ]);
-    email = answers.email?.trim();
+    printSetupEmailInstructions();
+    process.exitCode = 1;
+    return;
   }
 
   if (!email || !isLikelyEmail(email)) {
