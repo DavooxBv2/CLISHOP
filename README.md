@@ -50,6 +50,16 @@ npm install -g clishop
 
 This gives you two commands: `clishop` (the CLI) and `clishop-mcp` (the MCP server for AI agents).
 
+### OpenClaw
+
+Once the ClawHub package is published, install CLISHOP into an OpenClaw workspace with:
+
+```bash
+openclaw plugins install clawhub:clishop
+```
+
+The bundle exposes the CLISHOP skill under `skills/clishop/SKILL.md` and merges the packaged MCP defaults from `.mcp.json` so OpenClaw can launch `clishop --mcp` automatically.
+
 ### Linux / WSL
 
 CLISHOP works out of the box on Linux and WSL. On systems without a native keychain, tokens are stored in a local file (`~/.config/clishop/auth.json`) with restricted permissions.

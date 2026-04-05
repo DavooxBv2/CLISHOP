@@ -1,12 +1,15 @@
 {
   "name": "clishop",
+  "displayName": "CLISHOP",
   "version": "1.5.4",
   "mcpName": "io.github.StefDCL/clishop",
   "description": "CLISHOP — Order anything from your terminal",
   "main": "dist/index.js",
   "files": [
     "dist",
-    "openclaw",
+    "skills",
+    ".mcp.json",
+    "openclaw.bundle.json",
     "server.json"
   ],
   "bin": {
@@ -30,6 +33,8 @@
     "cli",
     "shopping",
     "ordering",
+    "openclaw",
+    "clawhub",
     "mcp",
     "model-context-protocol",
     "ai",
