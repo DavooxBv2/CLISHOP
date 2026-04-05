@@ -1,11 +1,13 @@
 {
   "name": "clishop",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "mcpName": "io.github.StefDCL/clishop",
   "description": "CLISHOP — Order anything from your terminal",
   "main": "dist/index.js",
   "files": [
-    "dist"
+    "dist",
+    "openclaw",
+    "server.json"
   ],
   "bin": {
     "clishop": "dist/index.js",

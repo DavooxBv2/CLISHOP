@@ -1,20 +1,13 @@
 ---
 name: clishop
 description: "Order anything from your terminal — search products, compare prices across stores, place orders, manage addresses and payments. Built for AI agents and humans."
-homepage: https://github.com/DavooxBv2/CLISHOP
-metadata:
-  clawdbot:
-    emoji: "🛍️"
-    requires:
-      env: ["CLISHOP_API_URL"]
-    files: ["scripts/*"]
 ---
 
 # CLISHOP — Buy anything from your terminal
 
 CLISHOP is an open-source MCP server and CLI that lets AI agents search for products across multiple stores, compare prices, and place real orders — all from the terminal.
 
-**19 MCP tools** for the full shopping lifecycle: search → compare → buy → track → return.
+**46 MCP tools** for the full shopping lifecycle: search → compare → buy → track → review → return.
 
 ## Installation
 
@@ -41,6 +34,8 @@ npx -y clishop --mcp     # Without installing
 
 | Tool | Description | Read-only |
 |------|-------------|-----------|
+| `setup` | Create or sign in with an email address (completes immediately) | ❌ |
+| `setup_status` | Check a legacy setup session by setup_id | ✅ |
 | `search_products` | Search across all connected stores with filters (price, brand, category, shipping, ratings) | ✅ |
 | `get_product` | Get detailed info about a specific product | ✅ |
 | `buy_product` | Place an order (respects agent safety limits) | ❌ |
@@ -50,24 +45,41 @@ npx -y clishop --mcp     # Without installing
 | `list_addresses` | List saved shipping addresses | ✅ |
 | `add_address` | Add a new shipping address | ❌ |
 | `remove_address` | Remove a saved address | ❌ |
+| `set_default_address` | Set the default shipping address for the active agent | ❌ |
 | `list_payment_methods` | List saved payment methods | ✅ |
+| `remove_payment_method` | Remove a saved payment method | ❌ |
+| `set_default_payment_method` | Set the default payment method for the active agent | ❌ |
 | `list_stores` | Browse available stores | ✅ |
 | `get_store` | View store details | ✅ |
 | `store_catalog` | Browse a store's product catalog | ✅ |
 | `account_status` | Full account overview (user, agents, addresses, payments) | ✅ |
 | `list_agents` | List safety profiles (spending limits, allowed categories) | ✅ |
+| `get_agent` | View details of a specific agent | ✅ |
+| `create_agent` | Create a new agent (safety profile) with spending limits | ❌ |
+| `update_agent` | Update an agent's settings (limits, categories, defaults) | ❌ |
+| `switch_agent` | Switch the active agent | ❌ |
+| `get_spending_limit` | View the current monthly spending limit | ✅ |
+| `set_spending_limit` | Change the monthly spending limit | ❌ |
+| `add_product_review` | Write a product review (1-10 rating) | ❌ |
+| `add_store_review` | Write a store review (1-10 rating) | ❌ |
+| `list_reviews` | List all your product and store reviews | ✅ |
+| `get_product_rating` | View rating details for a product | ✅ |
+| `get_store_rating` | View rating details for a store | ✅ |
+| `delete_review` | Delete one of your reviews | ❌ |
 | `create_advertise_request` | Post a request for vendors to bid on | ❌ |
+| `list_advertise_requests` | List your advertised requests | ✅ |
+| `get_advertise_request` | View an advertised request and its bids | ✅ |
+| `accept_advertise_bid` | Accept a vendor's bid | ❌ |
+| `reject_advertise_bid` | Reject a vendor's bid | ❌ |
+| `cancel_advertise_request` | Cancel an open advertised request | ❌ |
 | `create_support_ticket` | Create a support ticket for an order | ❌ |
 | `list_support_tickets` | List support tickets | ✅ |
+| `get_support_ticket` | View a support ticket and its message history | ✅ |
+| `reply_to_support_ticket` | Send a reply to a support ticket | ❌ |
+| `close_support_ticket` | Close a resolved support ticket | ❌ |
 | `submit_feedback` | Report a bug or suggest an improvement | ❌ |
-
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `CLISHOP_API_URL` | No | Override the API base URL (defaults to `https://clishop-backend.vercel.app/api`) |
-
-Authentication is handled through the setup flow, which stores the session token securely in the OS keychain when available (via keytar) or falls back to local file storage. No API key env var is needed.
+| `list_feedback` | List your submitted bug reports and suggestions | ✅ |
+| `get_feedback` | View details of a specific feedback item | ✅ |
 
 ## External Endpoints
 
@@ -75,6 +87,7 @@ All network requests go to the CLISHOP API:
 
 | Endpoint | Method | Data sent | Purpose |
 |----------|--------|-----------|---------|
+| `/auth/setup-link` | POST | Email address | Create account / sign in |
 | `/products/search` | GET | Search query, filters (category, brand, price range, country) | Product search |
 | `/products/:id` | GET | Product ID | Product details |
 | `/products/extended/:id` | GET | Product ID | Extended product lookup across vendor stores |
@@ -87,15 +100,30 @@ All network requests go to the CLISHOP API:
 | `/addresses` | POST | Full address fields (name, street, city, country, etc.) | Add address |
 | `/addresses/:id` | DELETE | Address ID | Remove address |
 | `/payment-methods` | GET | Agent name | List payment methods |
+| `/payment-methods/:id` | DELETE | Payment method ID | Remove payment method |
 | `/stores` | GET | Query, filters | Browse stores |
 | `/stores/:id` | GET | Store ID/slug | Store details |
 | `/stores/:id/products` | GET | Query, filters | Store catalog |
 | `/agents` | GET | — | List agents |
-| `/advertise` | POST | Title, description, brand, quantity, max bid price | Create advertise request |
+| `/spending-limit` | GET/PATCH | Limit in cents | Get/set spending limit |
+| `/products/:id/reviews` | POST | Rating, title, body | Product review |
+| `/stores/:id/reviews` | POST | Rating, title, body | Store review |
+| `/reviews/mine` | GET | — | List own reviews |
+| `/products/:id/rating` | GET | — | Product rating details |
+| `/stores/:id/rating` | GET | — | Store rating details |
+| `/advertise` | GET/POST | Title, description, brand, quantity, max bid price | Advertise requests |
+| `/advertise/:id` | GET | — | Advertise request details |
+| `/advertise/:id/bids/:id/accept` | POST | — | Accept bid |
+| `/advertise/:id/bids/:id/reject` | POST | — | Reject bid |
+| `/advertise/:id/cancel` | POST | — | Cancel advertise request |
 | `/support` | GET/POST | Ticket details or status filter | Support tickets |
-| `/feedback` | POST | Feedback type, title, description | Submit feedback |
+| `/support/:id` | GET | — | Support ticket details |
+| `/support/:id/reply` | POST | Message | Reply to support ticket |
+| `/support/:id/status` | PATCH | Status | Close support ticket |
+| `/feedback` | GET/POST | Feedback type, title, description | Feedback |
+| `/feedback/:id` | GET | — | Feedback details |
 
-All requests are sent over **HTTPS** to `https://clishop-backend.vercel.app/api` (or the `CLISHOP_API_URL` override).
+All requests are sent over **HTTPS** to `https://clishop-backend.vercel.app/api`.
 
 ## Security & Privacy
 

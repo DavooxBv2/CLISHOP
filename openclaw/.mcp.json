@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "clishop": {
+      "command": "npx",
+      "args": ["-y", "clishop", "--mcp"]
+    }
+  }
+}

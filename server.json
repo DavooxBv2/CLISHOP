@@ -6,12 +6,12 @@
     "url": "https://github.com/DavooxBv2/CLISHOP",
     "source": "github"
   },
-  "version": "0.3.0",
+  "version": "1.5.4",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "clishop",
-      "version": "0.3.0",
+      "version": "1.5.4",
       "runtime": "node",
       "args": ["--mcp"],
       "transport": {
