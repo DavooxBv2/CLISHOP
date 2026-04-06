@@ -30,6 +30,43 @@ clishop-mcp              # If installed globally
 node ./dist/mcp.js       # From the installed package directory
 ```
 
+## OpenClaw usage rules
+
+When CLISHOP is installed in OpenClaw, prefer the MCP tools exposed by the CLISHOP server instead of shell commands.
+
+- OpenClaw commonly exposes these tools with a `clishop__<tool_name>` naming pattern, for example `clishop__list_addresses`, `clishop__add_address`, `clishop__set_default_address`, `clishop__list_payment_methods`, and `clishop__buy_product`.
+- If those MCP tools are available, do not fall back to `clishop address add` or other CLI subcommands.
+- If a user asks to add a home or shipping address and the address is already known from memory or prior conversation context, call the address tool directly and only ask for missing required fields.
+
+### Non-interactive address flow
+
+1. Call `clishop__list_addresses` or `list_addresses` first to check existing saved addresses.
+2. If the correct address already exists, reuse it and call `clishop__set_default_address` or `set_default_address` if needed.
+3. If no suitable address exists, call `clishop__add_address` or `add_address` directly with the known fields.
+4. Ask the user only for any missing required fields.
+5. Prefer `setDefault: true` when adding the main home address.
+
+Required fields for `add_address`:
+
+- `label`
+- `firstName`
+- `lastName`
+- `line1`
+- `city`
+- `postalCode`
+- `country`
+
+Optional fields:
+
+- `line2`
+- `region`
+- `phone`
+- `companyName`
+- `vatNumber`
+- `taxId`
+- `instructions`
+- `setDefault`
+
 ## Tools
 
 | Tool | Description | Read-only |
