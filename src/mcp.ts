@@ -21,7 +21,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod/v4";
 import axios from "axios";
-import { getApiClient, handleApiError } from "./api.js";
+import { ensureAgentOnBackend, getApiClient, handleApiError } from "./api.js";
 import { getActiveAgent, getConfig, getApiBaseUrl } from "./config.js";
 import {
   claimSetupSession,
@@ -69,7 +69,7 @@ function safeCall<T>(
 const server = new McpServer(
   {
     name: "clishop",
-    version: "1.5.10",
+    version: "1.5.11",
   },
   {
     capabilities: {
@@ -296,7 +296,7 @@ server.registerTool("buy_product", {
       throw new Error("No shipping address set. Add one first via the add_address tool.");
     }
     if (!paymentId) {
-      throw new Error("No payment method linked. Add one with the payment method tools before placing the order.");
+      throw new Error("No payment method linked. Use the add_payment_method tool to generate a secure human payment-setup link, then list_payment_methods after the human completes setup.");
     }
 
     const api = getApiClient();
@@ -555,6 +555,51 @@ server.registerTool("remove_address", {
     }
 
     return { success: true, message: "Address removed." };
+  });
+});
+
+// =====================================================================
+// TOOL: add_payment_method
+// =====================================================================
+server.registerTool("add_payment_method", {
+  title: "Add Payment Method",
+  description:
+    "Generate a secure payment-setup link for the active agent. Give this URL to the human so they can add a payment method in the web portal. The agent never handles raw card details.",
+  inputSchema: {
+    agent: z.string().optional().describe("Agent name (defaults to active agent)"),
+  },
+  annotations: {
+    title: "Add Payment Method",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: true,
+  },
+}, async (args) => {
+  return safeCall(async () => {
+    const activeAgent = getActiveAgent();
+    const agentName = args.agent || activeAgent.name;
+
+    await ensureAgentOnBackend(agentName);
+
+    const api = getApiClient();
+    const res = await api.post("/payment-methods/setup", {
+      agent: agentName,
+    });
+
+    const setupUrl = res.data?.setupUrl;
+    if (!setupUrl) {
+      throw new Error("Payment setup link was not returned by the backend.");
+    }
+
+    return {
+      ok: true,
+      agent: agentName,
+      setupUrl,
+      next_action: "open_setup_url",
+      human_message:
+        "Give this secure link to the human so they can add their payment method. CLISHOP never collects raw card details inside the agent.",
+    };
   });
 });
 

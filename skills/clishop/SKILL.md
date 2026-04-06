@@ -34,9 +34,10 @@ node ./dist/mcp.js       # From the installed package directory
 
 When CLISHOP is installed in OpenClaw, prefer the MCP tools exposed by the CLISHOP server instead of shell commands.
 
-- OpenClaw commonly exposes these tools with a `clishop__<tool_name>` naming pattern, for example `clishop__list_addresses`, `clishop__add_address`, `clishop__set_default_address`, `clishop__list_payment_methods`, and `clishop__buy_product`.
+- OpenClaw commonly exposes these tools with a `clishop__<tool_name>` naming pattern, for example `clishop__list_addresses`, `clishop__add_address`, `clishop__set_default_address`, `clishop__add_payment_method`, `clishop__list_payment_methods`, and `clishop__buy_product`.
 - If those MCP tools are available, do not fall back to `clishop address add` or other CLI subcommands.
 - If a user asks to add a home or shipping address and the address is already known from memory or prior conversation context, call the address tool directly and only ask for missing required fields.
+- If a user asks to add a payment method, call `clishop__add_payment_method` or `add_payment_method` to generate a secure setup link for the human. Do not ask the user to paste card details into chat.
 
 ### Non-interactive address flow
 
@@ -45,6 +46,16 @@ When CLISHOP is installed in OpenClaw, prefer the MCP tools exposed by the CLISH
 3. If no suitable address exists, call `clishop__add_address` or `add_address` directly with the known fields.
 4. Ask the user only for any missing required fields.
 5. Prefer `setDefault: true` when adding the main home address.
+
+### Payment method flow
+
+1. Call `clishop__list_payment_methods` or `list_payment_methods` first to see whether a payment method already exists.
+2. If none exists, call `clishop__add_payment_method` or `add_payment_method`.
+3. Give the returned `setupUrl` to the human and tell them to complete payment setup in the secure web portal.
+4. After the human confirms completion, call `clishop__list_payment_methods` again.
+5. If needed, call `clishop__set_default_payment_method` or `set_default_payment_method` with the chosen payment method ID.
+
+The agent must never collect raw card details in chat. The secure web flow is the supported path.
 
 Required fields for `add_address`:
 
@@ -102,6 +113,7 @@ Example `add_address` payload for a US home address in San Francisco:
 | `remove_address` | Remove a saved address | ❌ |
 | `set_default_address` | Set the default shipping address for the active agent | ❌ |
 | `list_payment_methods` | List saved payment methods | ✅ |
+| `add_payment_method` | Generate a secure payment-setup link for the human | ❌ |
 | `remove_payment_method` | Remove a saved payment method | ❌ |
 | `set_default_payment_method` | Set the default payment method for the active agent | ❌ |
 | `list_stores` | Browse available stores | ✅ |

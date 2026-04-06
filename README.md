@@ -98,7 +98,7 @@ clishop setup start --email user@example.com --json
 
 `setup start` returns immediately with account-ready status and stores auth locally.
 
-In OpenClaw, prefer the installed CLISHOP MCP tools over CLI shell commands. For address management, the intended flow is to call `list_addresses` first, then `add_address` non-interactively with any known fields, and ask the user only for missing required address fields (`label`, `firstName`, `lastName`, `line1`, `city`, `postalCode`, `country`).
+In OpenClaw, prefer the installed CLISHOP MCP tools over CLI shell commands. For address management, the intended flow is to call `list_addresses` first, then `add_address` non-interactively with any known fields, and ask the user only for missing required address fields (`label`, `firstName`, `lastName`, `line1`, `city`, `postalCode`, `country`). For payments, use `add_payment_method` to generate a secure setup link for the human, then check `list_payment_methods` after the human completes the web flow. The agent should never ask for raw card details in chat.
 
 - Search products right away with `clishop search <query>`
 - Add a shipping address later with `clishop address add`

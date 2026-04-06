@@ -23,9 +23,10 @@ Once setup is complete, you can search immediately and only add an address or pa
 
 When running inside OpenClaw, prefer the exposed CLISHOP MCP tools over shelling out to the CLI.
 
-- Use the CLISHOP tool surface from the installed MCP server. In OpenClaw, these tools are commonly surfaced with the `clishop__` prefix, for example `clishop__list_addresses`, `clishop__add_address`, `clishop__set_default_address`, `clishop__list_payment_methods`, and `clishop__buy_product`.
+- Use the CLISHOP tool surface from the installed MCP server. In OpenClaw, these tools are commonly surfaced with the `clishop__` prefix, for example `clishop__list_addresses`, `clishop__add_address`, `clishop__set_default_address`, `clishop__add_payment_method`, `clishop__list_payment_methods`, and `clishop__buy_product`.
 - Do not stop because a local `clishop` CLI binary is missing if the MCP tools are available.
 - Do not tell the user to run `clishop address add` when the OpenClaw MCP tools are present.
+- Do not ask the human to type card details into chat. Use `clishop__add_payment_method` to generate a secure web link and hand that link to the human.
 
 ## Non-interactive address flow
 
@@ -62,6 +63,7 @@ Example intent mapping inside OpenClaw:
 
 - "Add my home shipping address" -> `clishop__list_addresses`, then `clishop__add_address` if needed.
 - "Use my saved address and buy this" -> `clishop__list_addresses`, optionally `clishop__set_default_address`, then `clishop__buy_product`.
+- "Add a payment method" -> `clishop__add_payment_method`, then give the secure `setupUrl` to the human, then `clishop__list_payment_methods` after the human completes the web flow.
 
 Example `clishop__add_address` payload for a US home address in San Francisco:
 
@@ -97,6 +99,7 @@ Example `clishop__add_address` payload for a US home address in San Francisco:
 - CLISHOP can trigger real purchases.
 - Use confirmation requirements and conservative spending limits for autonomous agents.
 - Authentication tokens are stored by the CLISHOP runtime in the OS keychain when available, or local file storage otherwise.
+- Payment methods are added through a secure human web flow. The agent should return the setup link to the human and never request raw card details in chat.
 
 ## Runtime
 

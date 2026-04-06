@@ -1,7 +1,7 @@
 {
   "name": "clishop",
   "displayName": "CLISHOP",
-  "version": "1.5.10",
+  "version": "1.5.11",
   "mcpName": "io.github.StefDCL/clishop",
   "description": "CLISHOP — Order anything from your terminal",
   "main": "dist/index.js",
