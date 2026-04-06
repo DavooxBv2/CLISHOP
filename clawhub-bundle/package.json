@@ -1,7 +1,7 @@
 {
   "name": "clishop",
   "displayName": "CLISHOP",
-  "version": "1.5.9",
+  "version": "1.5.10",
   "description": "CLISHOP for OpenClaw",
   "private": true,
   "license": "MIT"

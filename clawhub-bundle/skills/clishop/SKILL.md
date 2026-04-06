@@ -63,6 +63,24 @@ Example intent mapping inside OpenClaw:
 - "Add my home shipping address" -> `clishop__list_addresses`, then `clishop__add_address` if needed.
 - "Use my saved address and buy this" -> `clishop__list_addresses`, optionally `clishop__set_default_address`, then `clishop__buy_product`.
 
+Example `clishop__add_address` payload for a US home address in San Francisco:
+
+```json
+{
+	"label": "Home",
+	"firstName": "Alex",
+	"lastName": "Johnson",
+	"line1": "1234 Hayes Street",
+	"city": "San Francisco",
+	"region": "CA",
+	"postalCode": "94117",
+	"country": "United States",
+	"phone": "+14155550123",
+	"instructions": "Leave at front door",
+	"setDefault": true
+}
+```
+
 ## Core capabilities
 
 - search products across connected stores

@@ -67,6 +67,24 @@ Optional fields:
 - `instructions`
 - `setDefault`
 
+Example `add_address` payload for a US home address in San Francisco:
+
+```json
+{
+	"label": "Home",
+	"firstName": "Alex",
+	"lastName": "Johnson",
+	"line1": "1234 Hayes Street",
+	"city": "San Francisco",
+	"region": "CA",
+	"postalCode": "94117",
+	"country": "United States",
+	"phone": "+14155550123",
+	"instructions": "Leave at front door",
+	"setDefault": true
+}
+```
+
 ## Tools
 
 | Tool | Description | Read-only |
