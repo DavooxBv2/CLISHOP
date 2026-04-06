@@ -41,7 +41,7 @@ Once setup is complete, you can search immediately and only add an address or pa
 This bundle configures OpenClaw to launch:
 
 ```bash
-npx -y clishop@1.5.4 --mcp
+npx -y clishop@1.5.7 --mcp
 ```
 
 ## Links

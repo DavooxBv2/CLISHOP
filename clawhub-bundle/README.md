@@ -9,7 +9,7 @@ openclaw plugins install clawhub:clishop
 This bundle adds:
 
 - the CLISHOP shopping skill
-- default MCP configuration that launches `npx -y clishop@1.5.4 --mcp`
+- default MCP configuration that launches `npx -y clishop@1.5.7 --mcp`
 - explicit Claude/OpenClaw bundle metadata so the installed plugin registers as `clishop`
 
 After install, restart OpenClaw or start a new session.

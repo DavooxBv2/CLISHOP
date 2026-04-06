@@ -2,7 +2,7 @@
   "mcpServers": {
     "clishop": {
       "command": "npx",
-      "args": ["-y", "clishop@1.5.4", "--mcp"]
+      "args": ["-y", "clishop@1.5.7", "--mcp"]
     }
   }
 }

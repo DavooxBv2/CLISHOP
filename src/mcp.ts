@@ -67,7 +67,7 @@ function safeCall<T>(
 const server = new McpServer(
   {
     name: "clishop",
-    version: "1.5.4",
+    version: "1.5.7",
   },
   {
     capabilities: {
