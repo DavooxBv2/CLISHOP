@@ -27,7 +27,7 @@ Then search products, and only add an address or payment method when the user is
 
 ```bash
 clishop-mcp              # If installed globally
-npx -y clishop --mcp     # Without installing
+node ./dist/mcp.js       # From the installed package directory
 ```
 
 ## Tools

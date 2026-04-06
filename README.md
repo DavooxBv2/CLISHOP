@@ -58,7 +58,7 @@ Once the ClawHub package is published, install CLISHOP into an OpenClaw workspac
 openclaw plugins install clawhub:clishop
 ```
 
-The bundle exposes the CLISHOP skill under `skills/clishop/SKILL.md` and merges the packaged MCP defaults from `.mcp.json` so OpenClaw can launch `clishop --mcp` automatically.
+The bundle exposes the CLISHOP skill under `skills/clishop/SKILL.md` and merges the packaged MCP defaults from `.mcp.json` so OpenClaw can launch the bundled CLISHOP MCP runtime locally without fetching npm code at startup.
 
 ### Linux / WSL
 
@@ -198,7 +198,7 @@ CLISHOP ships as a native MCP server with 46 tools. Any MCP-compatible client ge
 
 ```bash
 clishop-mcp              # If installed globally
-npx -y clishop --mcp     # Without installing
+node ./dist/mcp.js       # From the installed package directory
 ```
 
 The MCP onboarding tools now follow the same email-first model:

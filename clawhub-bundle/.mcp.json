@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "clishop": {
-      "command": "npx",
-      "args": ["-y", "clishop@1.5.7", "--mcp"]
+      "command": "node",
+      "args": ["./dist/mcp.cjs"]
     }
   }
 }

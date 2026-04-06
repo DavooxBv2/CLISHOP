@@ -17,6 +17,8 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod/v4";
 import axios from "axios";
 import { getApiClient, handleApiError } from "./api.js";
@@ -67,7 +69,7 @@ function safeCall<T>(
 const server = new McpServer(
   {
     name: "clishop",
-    version: "1.5.7",
+    version: "1.5.8",
   },
   {
     capabilities: {
@@ -1558,9 +1560,12 @@ export async function startMcpServer() {
 }
 
 // Direct entry point: node dist/mcp.js
+const moduleEntryPath =
+  typeof __filename !== "undefined"
+    ? __filename
+    : fileURLToPath(import.meta.url);
 const isDirectEntry =
-  import.meta.url === `file:///${process.argv[1]?.replace(/\\/g, "/")}` ||
-  import.meta.url === `file://${process.argv[1]?.replace(/\\/g, "/")}`;
+  !!process.argv[1] && resolve(process.argv[1]) === resolve(moduleEntryPath);
 
 if (isDirectEntry) {
   startMcpServer().catch((err) => {

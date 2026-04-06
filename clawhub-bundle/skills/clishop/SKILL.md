@@ -14,7 +14,7 @@ After installing the bundle, authenticate with your email address using the CLIS
 Typical first step:
 
 ```bash
-clishop setup start --email user@example.com --json
+Use the `setup` tool with the user's email address.
 ```
 
 Once setup is complete, you can search immediately and only add an address or payment method when you are ready to buy.
@@ -41,7 +41,7 @@ Once setup is complete, you can search immediately and only add an address or pa
 This bundle configures OpenClaw to launch:
 
 ```bash
-npx -y clishop@1.5.7 --mcp
+node ./dist/mcp.cjs
 ```
 
 ## Links

@@ -9,7 +9,7 @@ openclaw plugins install clawhub:clishop
 This bundle adds:
 
 - the CLISHOP shopping skill
-- default MCP configuration that launches `npx -y clishop@1.5.7 --mcp`
+- a bundled MCP runtime launched locally with `node ./dist/mcp.cjs`
 - explicit Claude/OpenClaw bundle metadata so the installed plugin registers as `clishop`
 
 After install, restart OpenClaw or start a new session.
@@ -20,7 +20,7 @@ CLISHOP lets agents and users search products across connected stores, compare o
 
 ## Authentication
 
-Use the CLISHOP setup flow with your email address. The underlying CLI stores session tokens in the OS keychain when available and falls back to local file storage when needed.
+Use the CLISHOP setup tool with your email address. The packaged runtime stores session tokens in the OS keychain when available and falls back to local file storage when needed.
 
 ## Safety
 

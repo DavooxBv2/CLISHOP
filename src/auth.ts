@@ -7,7 +7,9 @@ import {
   fileDeletePassword,
 } from "./auth-file-store.js";
 
-const require = createRequire(import.meta.url);
+const require = createRequire(
+  typeof __filename !== "undefined" ? __filename : import.meta.url,
+);
 
 // ---------------------------------------------------------------------------
 // Lazy keytar loader — avoids crashing the entire CLI when libsecret is

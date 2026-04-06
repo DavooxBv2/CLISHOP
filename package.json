@@ -1,7 +1,7 @@
 {
   "name": "clishop",
   "displayName": "CLISHOP",
-  "version": "1.5.7",
+  "version": "1.5.8",
   "mcpName": "io.github.StefDCL/clishop",
   "description": "CLISHOP — Order anything from your terminal",
   "main": "dist/index.js",
@@ -17,7 +17,8 @@
     "clishop-mcp": "dist/mcp.js"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsup --config tsup.clawhub.config.ts",
+    "build:bundle": "tsup --config tsup.clawhub.config.ts",
     "dev": "tsx src/index.ts",
     "dev:mcp": "tsx src/mcp.ts",
     "start": "node dist/index.js",
